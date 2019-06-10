@@ -42,6 +42,18 @@
 # !chem observation codes
 # id_totco_obs=5001
 # id_co_obs = 5002
+#
+# Código sib.id
+#
+# ADPUPA = 1 (sondeos)
+# AIRCFT = 3 (aviones)
+# SATWND = 4 (vectores de satélite geoestacionario)
+# ADPSFC = 8 (estaciones de superficie)
+# SFCSHP = 9 (barcos y boyas)
+# ASCATW = 20 (vientos de ASCAT)
+# AIRS = 21 (perfiles de satélite AIRS)
+# ADPAUT = 22 (estaciones automáticas-> las incluimos nosotros)
+# GNSS = 23 (Global Network … -> las incluimos nosotros)
 
 
 
@@ -74,7 +86,7 @@ read.obs.asim <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 833
   return(out)
 }
 
-read.obs <- function(filepath) {
+read.obs <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331)) {
   files <- Sys.glob(filepath)
   #Para archivos con obs cada 10 minutos
   
@@ -86,8 +98,9 @@ read.obs <- function(filepath) {
     
     obs <- all.data[all.data != all.data[1]]
     obs <- data.table::as.data.table(matrix(obs, ncol = 7, byrow = TRUE))
-    
+
     colnames(obs) <- c("obs.id", "lon", "lat", "elev", "obs", "error", "sub.id")
+    obs <- obs[obs.id %in% keep.obs] #Filter obs in keep.obs
     date_obs <- date[i]
     obs[, time := date_obs]
 
