@@ -1,0 +1,89 @@
+---
+title: "02_comparacion_obs"
+author: "Pao"
+date: "June 10, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(metR)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(interp)
+library(patchwork)
+library(lubridate)
+source('read_files.R')
+```
+
+## GOES Wind
+
+La idea es comparar los datos de viento del GOES que se usaron durante relampago con los que están disponibles en el prepbufr (SATWND). Cómo tengo prepbufr para ventanas de 1 hora centradas voy a comparar las obs de las 18 UTC del 20181120 (o sea las obs entre las 17:30 y las 18:30) con las observaciones en ese período.
+
+```{r obs_prepb}
+obs_pb <- fread('../obs_PREPBUFR/20182011_18_prepbufr.csv', 
+                na.strings = "100000000000.000")
+colnames(obs_pb) <- c("obs.id", "time", "station", "lon", "lat", "dhr", "sub.id", "station.elev", "p", "q", "t", "elev", "u", "v", "pwo", "cat", "press")
+
+obs_pb[, time := ymd_h(time)]
+obs_pb[, time.obs := time + as.period(as.duration(days(x=1))*(dhr/24))]
+
+obs_pb <- obs_pb[obs.id == "SATWND"] %>% 
+  .[lon %between% c(290, 310) & lat %between% c(-40, -20)]
+
+#Le saco variables
+
+knitr::kable(obs_pb[, .N, by = .(sub.id)])
+
+```
+
+Estos son los typos de observación dentro de "SATWND" y corresponden a:
+
+241           SATWND                 INDIA IR AND VISIBLE CLOUD DRIFT U, V (INSAT-2E)                            +
+ 
+242           SATWND                 JMA IR AND VISIBLE CLOUD DRIFT U, V AT LEVELS BELOW 850 MB (GMS-5)          A
+ 
+*243           SATWND                 EUMETSAT IR AND VISIBLE CLOUD DRIFT U, V AT LEVELS BELOW 850 MB             A*
+                                     (METEOSAT-5, METEOSAT-7)
+ 
+244           ------                 currently not used                                                          n/a
+ 
+245           SATWND                 NESDIS IR CLOUD DRIFT U, V (GOES-8, GOES-10)                                A
+ 
+246           SATWND                 NESDIS IMAGER WATER VAPOR CLOUD U, V AT CLOUD TOP (GOES-8, GOES-10)         A
+ 
+247           SATWND                 NESDIS IMAGER WATER VAPOR CLOUD U, V - DEEP LAYER (GOES-8, GOES-10)         *
+ 
+248           SATWND                 NESDIS SOUNDER WATER VAPOR CLOUD U, V AT CLOUD TOP (GOES-8, GOES-10)        *
+ 
+249           SATWND                 NESDIS SOUNDER WATER VAPOR CLOUD U, V - DEEP LAYER (GOES-8, GOES-10)        * 
+ 
+250           SATWND                 JMA WATER VAPOR CLOUD U, V (GMS-5)                                          +
+ 
+251           SATWND                 NESDIS VISIBLE CLOUD DRIFT U, V (GOES-8, GOES-10)                           +
+ 
+252           SATWND                 JMA IR AND VISIBLE CLOUD DRIFT U, V AT LEVELS ABOVE 850 MB (GMS-5)          A 
+ 
+*253           SATWND                 EUMETSAT IR AND VISIBLE CLOUD DRIFT U, V AT LEVELS ABOVE 850 MB             A*
+                                     (METEOSAT-5, METEOSAT-7)
+ 
+*254           SATWND                 EUMETSAT WATER VAPOR CLOUD U, V (METEOSAT-5, METEOSAT-7)                    +*
+ 
+255           SATWND                 NESDIS PICTURE TRIPLET CLOUD U, V (GOES-8, GOES-10)                         A
+ 
+256           SATWND                 INDIA WATER VAPOR CLOUD U, V (INSAT-2E)                                     *
+
+```{r obs_rra}
+obs <- read.obs('../obs_RRA/20181120_18/*0.dat', keep.obs = c(2819,2820)) %>% 
+  rbind(read.obs('../obs_RRA/20181120_19/*0.dat', keep.obs = c(2819,2820)))
+
+#Filtro solo lo que necesito (time range, dominio, tipo de u,v)
+obs_rra <- obs[time %between% c(as_datetime("2018-11-20 17:30:00"), as_datetime("2018-11-20 18:30:00"))] %>% 
+  .[sub.id == 4] %>%  #Asumo que sub.id = 4  es para los datos del goes porque son muchísimos y al graficar podrían tener pinta
+  .[lon %between% c(290, 310) & lat %between% c(-40, -20)]
+
+
+```
+
