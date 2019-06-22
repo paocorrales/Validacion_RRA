@@ -3,8 +3,8 @@ title: "Validación - Obs de superficie"
 author: "Pao"
 date: "June 4, 2019"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -36,9 +36,9 @@ La variable `obs.id`es númerica y permite clasificar los tipos de observaciones
 ### Pruebas para un tiempo en particular
 
 ```{r read_obs}
-filename <- 'obs_20181120_00_asimiladas.dat'
+filepath <- '../obs_RRA/20181120_00/obs_20181120_00_asimiladas.dat'
 
-obs <- read.obs.asim(filename)
+obs <- read.obs.asim(filepath)
 
 knitr::kable(head(obs))
 ```
@@ -112,7 +112,7 @@ obs[obs.id == 83073] %>%
 Acá se ve también que en el slot 7 la diferecia analisis - observación es mucho más grande que para el resto. El analisis sobreestima la observación es la mayoría de los casos.
 
 ```{r}
-obs2 <- read.obs.asim('obs_20181120_01_asimiladas.dat')
+obs2 <- read.obs.asim('../obs_RRA/20181120_01/obs_20181120_01_asimiladas.dat')
 
 obs2[, .N, keyby = .(time.slot, obs.id)] %>% 
   dcast(time.slot ~ obs.id, value.var = 'N') %>% 
@@ -133,7 +133,7 @@ Mientras resuelvo todo lo anterior, voy a comparar derecho con lo que hay.
 Por ahora leo solo temperatura a 2 metros de 1 miembro del ensable. Luego veremos como nos las arreglamos para leer todo junto.
 
 ```{r}
-file.nc <- 'NPP_2018-11-20_00_FC00.nc'
+file.nc <- '../obs_RRA/20181120_00F/NPP_2018-11-20_00_FC00.nc'
 
 # Leo
 t2 <- ReadNetCDF(file.nc, vars = c("XLONG", "XLAT", "T2"), subset = list(ens = 1))
