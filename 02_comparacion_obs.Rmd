@@ -70,6 +70,10 @@ Estos son los typos de observación dentro de "SATWND" y corresponden a:
 
 Así que entiendo que GOES-16 no estaría llegando a los prepbufrs...
 
+Pero, encontré la [siguiente tabla](https://www.emc.ncep.noaa.gov/mmb/data_processing/common_tbl_c1-c5.htm#c-5) que contendría los códigos actualizados y un [ejemplo](https://www.emc.ncep.noaa.gov/mmb/data_processing/Satellite_Historical_Documentation.htm#Sec._XIII) donde se explica que significan los caracteres que hay en el lugar de la estación. Para mis prepbufr como no se de donde vienen voy a dejar ese dato como "XXXXXX".
+
+De todo lo antererior concluyo que el **el código para GOES-16 es 270**
+
 
 ```{r obs_rra}
 obs_rra <- read.obs('../obs_RRA/20181120_18/*0.dat', keep.obs = c(2819,2820)) %>% 
