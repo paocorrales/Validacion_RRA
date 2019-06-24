@@ -34,4 +34,18 @@ uv[sub.id == 1] %>%
   geom_point(aes(color = obs)) +
   scale_y_level()
 
-             
+
+wind[V4 > 290 & V4 < 305 & V5 > -39 & V5 < -23] %>% 
+  ggplot(aes(V4, V5)) +
+  # geom_contour(data = topo, aes(z = h), color = "darkgray") +
+  #geom_point(data = temp3, aes(x = lon, y = lat, color = "red")) +
+  geom_point(aes(color = V13)) +
+  labs(title = "SATWIND_prepbufr")
+
+temp2[obs.id == 2819] %>% 
+ggplot(aes(lon, lat)) +
+  geom_point(aes(color = obs)) +
+  labs(title = "U (sat) 20181120_18")
+
+
+ggsave("SATWIND_prepbufr.png")             

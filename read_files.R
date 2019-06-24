@@ -57,7 +57,9 @@
 
 
 
-read.obs.asim <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331)) { 
+read.obs.asim <- function(filepath, 
+                          keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331),
+                          keep.sub.obs = c(4)) { 
   files <- Sys.glob(filepath)
   #Para archivos con obs cada 10 minutos
   
@@ -72,7 +74,7 @@ read.obs.asim <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 833
     obs <- data.table::as.data.table(matrix(obs, ncol = 10, byrow = TRUE))
     colnames(obs) <- c("obs.id", "lon", "lat", "elev", "obs", "error", "sub.id", "ens.obs", "ana.obs", "time.slot")
     
-    obs <- obs[obs.id %in% keep.obs] #Filter obs in keep.obs
+    obs <- obs[obs.id %in% keep.obs & sub.id %in% keep.sub.obs] #Filter obs in keep.obs
     date_obs <- date[i]
     obs[, time := date_obs]
     obs[, time.obs := time - lubridate::minutes((7 - time.slot)*10)]
@@ -86,7 +88,9 @@ read.obs.asim <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 833
   return(out)
 }
 
-read.obs <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331)) {
+read.obs <- function(filepath, 
+                     keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331),
+                     keep.sub.obs = c(4)) {
   files <- Sys.glob(filepath)
   #Para archivos con obs cada 10 minutos
   
@@ -100,7 +104,7 @@ read.obs <- function(filepath, keep.obs = c(14593, 82819, 82820, 83073, 83330, 8
     obs <- data.table::as.data.table(matrix(obs, ncol = 7, byrow = TRUE))
 
     colnames(obs) <- c("obs.id", "lon", "lat", "elev", "obs", "error", "sub.id")
-    obs <- obs[obs.id %in% keep.obs] #Filter obs in keep.obs
+    obs <- obs[obs.id %in% keep.obs & sub.id %in% keep.sub.obs] #Filter obs in keep.obs
     date_obs <- date[i]
     obs[, time := date_obs]
 
