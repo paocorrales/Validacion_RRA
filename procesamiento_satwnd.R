@@ -40,4 +40,4 @@ obs_pb[, time := ymd_h(time)]
 obs_pb[, time.obs := time + as.period(as.duration(days(x=1))*(dhr/24))]
 
 obs_pb <- obs_pb[obs.id == "SATWND"] %>% 
-  .[lon %between% c(290, 310) & lat %between% c(-45, -20)]
+  .[lon %between% c(287, 310) & lat %between% c(-45, -20)]
