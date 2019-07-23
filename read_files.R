@@ -59,7 +59,8 @@
 
 read.obs.asim <- function(filepath, 
                           keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331),
-                          keep.sub.obs = NULL) { 
+                          keep.sub.obs = NULL,
+                          keep.time.slot = NULL) { 
   files <- Sys.glob(filepath)
   #Para archivos con obs cada 10 minutos
   
@@ -79,6 +80,10 @@ read.obs.asim <- function(filepath,
     } else {
       obs <- obs[obs.id %in% keep.obs & sub.id %in% keep.sub.obs] #Filter obs in keep.obs
     }
+    
+    if (!is.null(keep.time.slot)) {
+      obs <- obs[time.slot %in% keep.time.slot] #Filter obs in time.slot
+    } 
     
     date_obs <- date[i]
     obs[, time := date_obs]
