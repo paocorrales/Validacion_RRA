@@ -50,5 +50,25 @@ ggplot(aes(lon, lat)) +
 
 ggsave("SATWIND_prepbufr.png")             
 
+# forecast
 
-obs <- read.obs.asim("../obs_RRA/20181120_1*/*s.dat", keep.obs = c(14593), keep.time.slot = c(1, 7))
+out[, obs.fcst := obs - fcst]
+
+mean_ens <- out[, .(rmse = mean(obs.fcst^2)), by = .(time.obs)]
+
+out[, .(rmse = mean(obs.fcst^2)), by = .(ens, time.obs)] %>% 
+  ggplot(aes(time.obs, rmse)) +
+  geom_line(aes(group = ens), color = "grey") +
+  geom_line(data = a) +
+  geom_line(data = mean_ens, color = "red")
+
+# Error de la media
+
+a <- out[, .(obs.mean = mean(obs), fcst.mean = mean(fcst)), by = .(lon, lat, time.obs)] %>% 
+  .[, .(rmse = mean((obs.mean-fcst.mean)^2)), by = .(time.obs)] 
+
+
+
+
+ggplot(out, aes(obs.fcst, time.obs)) +
+  geom_line(aes(group = ens))
