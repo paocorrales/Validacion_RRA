@@ -49,3 +49,6 @@ ggplot(aes(lon, lat)) +
 
 
 ggsave("SATWIND_prepbufr.png")             
+
+
+obs <- read.obs.asim("../obs_RRA/20181120_1*/*s.dat", keep.obs = c(14593), keep.time.slot = c(1, 7))

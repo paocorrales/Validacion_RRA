@@ -100,7 +100,7 @@ read.obs.asim <- function(filepath,
 
 read.obs <- function(filepath, 
                      keep.obs = c(14593, 82819, 82820, 83073, 83330, 83331),
-                     keep.sub.obs = NULL {
+                     keep.sub.obs = NULL) {
   files <- Sys.glob(filepath)
   #Para archivos con obs cada 10 minutos
   

@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(metR)
 library(ggplot2)
 library(data.table)
+library(lubridate)
 library(dplyr)
 library(interp)
 library(patchwork)
@@ -124,6 +125,38 @@ Leo las observaciones del tiempo siguiente (20181120_01) para ver si las del pri
 Eso también me genera problemas a la hora de comparar las observaciones con el pronóstico. Si comparo el pronóstico que verifica a las 00 del 20181120, algunas observaciones van a ser casi una hora viejas. No parece una buena comparación. Por eso estoy pensando que capaz es mejor organizar las observaciones en ventanas centradas en la hora de verificación de cada pronóstico. 
 
 Revisando este nuevo tiempo veo que ana.obs es cero en muchísisimas observaciones, básicamente todas las que no están en el slot 7.
+
+
+### ¿Me quedo con el slot 1 o el 7?
+
+Voy a comparar la cantidad de observaciones que hay en el último slot de un tiempo y el primer slot del siguiente. En principio el slot 1 debería tener más observaciones porque como se asimila después hay más tiempo para que lleguen nuevas observaciones. 
+
+```{r}
+#Slots 1 y 7 de 20181120  a las 18 y las 19 horas
+obs <- read.obs.asim("../obs_RRA/20181120_1*/*s.dat", keep.time.slot = c(1, 7)) 
+
+#Quiero el slot 7 del archivo de las 18UTC y el slot 1 del archivo de las 19 UTC. Ambos corresponden a las 18:00
+obs <- obs[time.obs == as_datetime("2018-11-20 18:00:00")]
+
+obs[, .N, keyby = .(time.slot, obs.id)] %>% 
+  knitr::kable()
+```
+
+Está dando al revez que lo que pensaba. Pruebo con otro par de tiempos.
+
+```{r}
+#Slots 1 y 7 de 20181120  a las 00 y las 01 horas
+obs <- read.obs.asim("../obs_RRA/20181120_0?/*s.dat", keep.time.slot = c(1, 7)) 
+
+#Quiero el slot 7 del archivo de las 00UTC y el slot 1 del archivo de las 01 UTC. Ambos corresponden a las 00:00
+obs <- obs[time.obs == as_datetime("2018-11-20 00:00:00")]
+
+obs[, .N, keyby = .(time.slot)] %>% 
+  knitr::kable()
+```
+
+No hay caso che.
+
 
 ### Forecast: lectura, interpolación, etc
 
