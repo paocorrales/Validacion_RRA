@@ -2,28 +2,50 @@
 # Hay pronósticos cada 3 horas a 36 horas. El plan es generar un archivo .csv 
 # para cada tipo de observación y para cada inicialización.
 
+# Recibe argumentos:
+# args = (filepath_nc, filepath_obs, var_rra, var_nc, fecha_ini)
 
-filepath_nc <- "../obs_RRA/20181120_00F/*.nc"
-var <- 83073
-var2 <- "T2"
-fecha_ini <- as_datetime("2018-11-20T00:00:00Z")
+args = commandArgs(trailingOnly=TRUE)
+
+if (length(args)==0) {
+  stop("Argumentos: filepath_nc, filepath_obs, var_rra, var_nc, fecha_ini (20181120_00)", call.=FALSE)
+}
+
+#Librerías
+library(lubridate)
+library(data.table)
+library(metR)
+library(dplyr)
+library(interp)
+
+# for (i in length(args)) {
+#   print(length(args))
+#   print(args[i])
+#   print(class(args[i]))
+# }
+
+
+filepath_nc <- args[1]
+filepath_obs <- args[2]
+var_rra <- args[3]
+var_nc <- args[4]
+fecha_ini <- ymd_h(args[5])
 fecha_fin <- fecha_ini + hours(36)
 
 # Leo el .csv con las observaciones y filtro el intervalo que me interesa.
-obs <- fread("../obs_83073.csv")
 
-obs <- fread(paste0("obs_", var, ".csv"))
+obs <- fread(filepath_obs)
 obs[, time := as_datetime(time)]
 obs[, time.obs := as_datetime(time.obs)]
 obs <- obs[time.obs %between% c(fecha_ini, fecha_fin)]
 
 # Leo los .nc y me quedo solo con la parte que necesito. 
-
+print(filepath_nc)
 files <- Sys.glob(filepath_nc)
-
+print(files)
 for (f in 1:length(files)) { 
 
-  fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var2))
+  fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc))
   
   time_verif <- fecha_ini + hours(f - 1)
   print(time_verif)
@@ -48,6 +70,6 @@ for (f in 1:length(files)) {
   }
 }
 
-fwrite(out, paste0("../fcst_", var, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv"))
+fwrite(out, paste0("../fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv"))
 
 

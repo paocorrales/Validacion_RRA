@@ -52,6 +52,8 @@ ggsave("SATWIND_prepbufr.png")
 
 # forecast
 
+out <- fread("../fcst_83073_20181120_00.csv")
+
 out[, obs.fcst := obs - fcst]
 
 mean_ens <- out[, .(rmse = mean(obs.fcst^2)), by = .(time.obs)]
