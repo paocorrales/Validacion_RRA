@@ -25,7 +25,7 @@ library(interp)
 # }
 
 
-filepath_nc <- args[1]
+filepath_nc <- paste0(args[1], "/*.nc")
 filepath_obs <- args[2]
 var_rra <- args[3]
 var_nc <- args[4]
@@ -33,6 +33,8 @@ fecha_ini <- ymd_h(args[5])
 fecha_fin <- fecha_ini + hours(36)
 
 # Leo el .csv con las observaciones y filtro el intervalo que me interesa.
+print(filepath_nc)
+print(filepath_obs)
 
 obs <- fread(filepath_obs)
 obs[, time := as_datetime(time)]
