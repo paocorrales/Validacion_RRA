@@ -75,9 +75,11 @@ read.obs.asim <- function(filepath,
     obs <- data.table::as.data.table(matrix(obs, ncol = 10, byrow = TRUE))
     colnames(obs) <- c("obs.id", "lon", "lat", "elev", "obs", "error", "sub.id", "ens.obs", "ana.obs", "time.slot")
     
-    if (is.null(keep.sub.obs)) {
+    if (!is.null(keep.sub)) {
       obs <- obs[obs.id %in% keep.obs] #Filter obs in keep.obs
-    } else {
+    }
+    
+    if (!is.null(keep.sub.obs)) {
       obs <- obs[obs.id %in% keep.obs & sub.id %in% keep.sub.obs] #Filter obs in keep.obs
     }
     
