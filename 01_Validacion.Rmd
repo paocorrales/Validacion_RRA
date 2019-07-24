@@ -195,3 +195,26 @@ p2 <- ggplot(t2.asim, aes(lon, lat)) +
 p1/p2  
 ```
 
+
+## All
+
+```{r}
+all <- fread("../obs_all.csv")
+all[, time := as_datetime(time)]
+all[, time.obs := as_datetime(time.obs)]
+str(all)
+```
+
+```{r}
+all[obs.id == 4001] %>% 
+  ggplot(aes(lon, lat)) +
+  geom_point(alpha = 0.5, aes(color = obs)) + 
+  coord_fixed() +
+  facet_wrap(~ factor(time.obs), ncol = 8)
+
+```
+
+```{r}
+
+```
+
