@@ -33,8 +33,6 @@ fecha_ini <- ymd_h(args[5])
 fecha_fin <- fecha_ini + hours(36)
 
 # Leo el .csv con las observaciones y filtro el intervalo que me interesa.
-print(filepath_nc)
-print(filepath_obs)
 
 obs <- fread(filepath_obs)
 obs[, time := as_datetime(time)]
@@ -42,13 +40,13 @@ obs[, time.obs := as_datetime(time.obs)]
 obs <- obs[time.obs %between% c(fecha_ini, fecha_fin)]
 
 # Leo los .nc y me quedo solo con la parte que necesito. 
-print(filepath_nc)
 files <- Sys.glob(filepath_nc)
-print(files)
+
 for (f in 1:length(files)) { 
 
   fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc))
   
+  print(basename(files[f]))
   time_verif <- fecha_ini + hours(f - 1)
   print(time_verif)
   

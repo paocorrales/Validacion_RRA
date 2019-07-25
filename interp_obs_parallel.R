@@ -7,7 +7,7 @@
 
 args = commandArgs(trailingOnly=TRUE)
 
-if (length(args)==0) {
+if (length(args) != 5) {
   stop("Argumentos: filepath_nc, filepath_obs, var_rra, var_nc, fecha_ini (20181120_00)", call.=FALSE)
 }
 
@@ -23,12 +23,7 @@ library(doParallel)
 myCluster <- makeCluster(4)
 registerDoParallel(myCluster)
 
-# for (i in length(args)) {
-#   print(length(args))
-#   print(args[i])
-#   print(class(args[i]))
-# }
-
+print(args)
 
 filepath_nc <- paste0(args[1], "/*.nc")
 filepath_obs <- args[2]
@@ -45,13 +40,13 @@ obs[, time.obs := as_datetime(time.obs)]
 obs <- obs[time.obs %between% c(fecha_ini, fecha_fin)]
 
 # Leo los .nc y me quedo solo con la parte que necesito. 
-print(filepath_nc)
-files <- as.list(Sys.glob(filepath_nc))
-print(files)
+files <- Sys.glob(filepath_nc)
 
-out <- foreach(f = 1:length(files), 
-               .packages = c("data.table", "interp", "metR", "lubridate")) %dopar% {
-
+out <- foreach(f = 1:length(files),
+               .packages = c("data.table", "metR", "lubridate", "interp", "dplyr"),
+               .export = c("files", "obs", "fecha_ini", "var_nc", "var_rra"),
+               .combine = "rbind") %dopar% { 
+  print(basename(files[f]))
   fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc))
   
   time_verif <- fecha_ini + hours(f - 1)
@@ -77,7 +72,9 @@ out <- foreach(f = 1:length(files),
   # }
 }
 
+stopCluster(myCluster)
+
 fwrite(out, paste0("../fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv"))
 
 
-stopCluster(myCluster)
+
