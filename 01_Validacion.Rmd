@@ -196,25 +196,70 @@ p1/p2
 ```
 
 
-## All
+Veamos si todo funcionó como queríamos. 
 
 ```{r}
-all <- fread("../obs_all.csv")
-all[, time := as_datetime(time)]
-all[, time.obs := as_datetime(time.obs)]
-str(all)
+obs <- fread("../obs_83073.csv")
+obs[, time := as_datetime(time)]
+obs[, time.obs := as_datetime(time.obs)]
+
+
+fcst <- fread("../fcst_83073_20181122_00.csv")
+fcst[, time := as_datetime(time)]
+fcst[, time.obs := as_datetime(time.obs)]
+
 ```
 
+A la izquierda se muestra la diferencia entre las observaciones y el pronóstico para un tiempo y mimebro de ensable determinado. A la derecha se calculó para le mismo tiempo la media del pronóstico antes de hacer la diferencia con las observaciones. No se ven grandes diferencias al menos para este tiempo.
+
 ```{r}
-all[obs.id == 4001] %>% 
+fcst[ens == 1 & time.obs == as_datetime("2018-11-22T00:00:00Z")] %>% 
   ggplot(aes(lon, lat)) +
-  geom_point(alpha = 0.5, aes(color = obs)) + 
+  geom_point(aes(color =  obs - fcst)) + 
+  scale_color_divergent(limits = c(-7, 7)) +
   coord_fixed() +
-  facet_wrap(~ factor(time.obs), ncol = 8)
+  theme(legend.position="bottom") +
+
+fcst[time.obs == as_datetime("2018-11-22T00:00:00Z")] %>% 
+  .[, .(mean = (mean(obs) - mean(fcst))), by = .(lon, lat, ens)] %>% 
+  ggplot(aes(lon, lat)) +
+  geom_point(aes(color =  mean)) + 
+  scale_color_divergent(name = "Diferencia de \nla media del ensamble", limits = c(-7, 7)) +
+  coord_fixed() +
+  theme(legend.position="bottom")
+
 
 ```
+
+Si calculamos el rmse para todo el periodo vemos que hay algunas estaciones donde el rmse es mayor a 10.
 
 ```{r}
+fcst[, .(rmse = sqrt(mean((obs - fcst)^2))), by = .(lon, lat)] %>% 
+  ggplot(aes(lon, lat)) +
+  # geom_point(aes(color = rmse)) 
+  geom_point(aes(color = rmse < 10))
+  
+```
+
+Y mirando la relación entre las observaciones y el pronóstico se ve que si bien hay una relación directa y la mayoría d elos puntos se ubican cerca de la recta hay una región donde se ve que el pronóstico sobre estima a las observaciones y algunos puntos anómalos que podrían corresponde a estaciones con problemas sistemáticos.
+
+```{r}
+ggplot(fcst, aes(obs, fcst)) + 
+  geom_point(alpha = 0.01, size = 0.1)
+```
+
+La estación con observaciones de temperatura menor a 275, tiene un valor constante de 173.15 lo que la hace más que sospechosa. Está ubicada en 302.4326 -37.9957 (algo así como Mar del plata). La región de puntos donde el pronóstico sobre esitma mucho a las observaciones corresponde principalmente a observaciones entre las 12 y las 01 UTC. Hay que tener en cuenta que justo estamos mirando un caso de MCS en la región. No parece haber diferencias entre los distintos miembros del emsable. 
+
+```{r}
+fcst[obs < 298 & fcst > 302] %>% 
+  ggplot(aes(lon, lat)) +
+  geom_point(aes(color = obs-fcst)) +
+  facet_wrap(~factor(time.obs))
 
 ```
+
+
+
+
+
 
