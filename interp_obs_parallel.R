@@ -20,7 +20,7 @@ library(interp)
 library(foreach)
 library(doParallel)
 
-myCluster <- makeCluster(4)
+myCluster <- makeCluster(20)
 registerDoParallel(myCluster)
 
 print(args)
@@ -42,15 +42,17 @@ obs <- obs[time.obs %between% c(fecha_ini, fecha_fin)]
 # Leo los .nc y me quedo solo con la parte que necesito. 
 files <- Sys.glob(filepath_nc)
 
-out <- foreach(f = 1:length(files),
+system.time(out <- foreach(f = 1:length(files),
                .packages = c("data.table", "metR", "lubridate", "interp", "dplyr"),
                .export = c("files", "obs", "fecha_ini", "var_nc", "var_rra"),
                .combine = "rbind") %dopar% { 
-  print(basename(files[f]))
+
+  sink("log.txt", append=TRUE)
+	
+  cat("Interpolando el pronóstico ", basename(files[f]), "\n")
   fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc))
   
   time_verif <- fecha_ini + hours(f - 1)
-  print(time_verif)
   
   obs_subset <- subset(obs, time.obs == time_verif)
   
@@ -70,11 +72,11 @@ out <- foreach(f = 1:length(files),
   # } else {
   #   out <- rbind(out, temp)
   # }
-}
+})
 
 stopCluster(myCluster)
 
-fwrite(out, paste0("../fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv"))
+fwrite(out, paste0("/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv"))
 
 
 
