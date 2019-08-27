@@ -37,7 +37,7 @@ La variable `obs.id`es númerica y permite clasificar los tipos de observaciones
 ### Pruebas para un tiempo en particular
 
 ```{r read_obs}
-filepath <- '../obs_RRA/20181120_00/obs_20181120_00_asimiladas.dat'
+filepath <- 'data/asimiladas/obs_20181120_00_asimiladas.dat'
 
 obs <- read.obs.asim(filepath)
 
@@ -113,7 +113,7 @@ obs[obs.id == 83073] %>%
 Acá se ve también que en el slot 7 la diferecia analisis - observación es mucho más grande que para el resto. El analisis sobreestima la observación es la mayoría de los casos.
 
 ```{r}
-obs2 <- read.obs.asim('../obs_RRA/20181120_01/obs_20181120_01_asimiladas.dat')
+obs2 <- read.obs.asim('data/asimiladas/obs_20181120_01_asimiladas.dat')
 
 obs2[, .N, keyby = .(time.slot, obs.id)] %>% 
   dcast(time.slot ~ obs.id, value.var = 'N') %>% 
@@ -133,29 +133,17 @@ Voy a comparar la cantidad de observaciones que hay en el último slot de un tie
 
 ```{r}
 #Slots 1 y 7 de 20181120  a las 18 y las 19 horas
-obs <- read.obs.asim("../obs_RRA/20181120_1*/*s.dat", keep.time.slot = c(1, 7)) 
+obs <- read.obs.asim("data/asimiladas/obs_20181120_1[8-9]_asimiladas.dat", keep.time.slot = c(1, 7)) 
 
 #Quiero el slot 7 del archivo de las 18UTC y el slot 1 del archivo de las 19 UTC. Ambos corresponden a las 18:00
 obs <- obs[time.obs == as_datetime("2018-11-20 18:00:00")]
 
 obs[, .N, keyby = .(time.slot, obs.id)] %>% 
+  dcast(time.slot ~ obs.id) %>% 
   knitr::kable()
 ```
 
-Está dando al revez que lo que pensaba. Pruebo con otro par de tiempos.
-
-```{r}
-#Slots 1 y 7 de 20181120  a las 00 y las 01 horas
-obs <- read.obs.asim("../obs_RRA/20181120_0?/*s.dat", keep.time.slot = c(1, 7)) 
-
-#Quiero el slot 7 del archivo de las 00UTC y el slot 1 del archivo de las 01 UTC. Ambos corresponden a las 00:00
-obs <- obs[time.obs == as_datetime("2018-11-20 00:00:00")]
-
-obs[, .N, keyby = .(time.slot)] %>% 
-  knitr::kable()
-```
-
-No hay caso che.
+Está dando al revez que lo que pensaba.
 
 
 ### Forecast: lectura, interpolación, etc
@@ -224,7 +212,7 @@ fcst[time.obs == as_datetime("2018-11-22T00:00:00Z")] %>%
   .[, .(mean = (mean(obs) - mean(fcst))), by = .(lon, lat, ens)] %>% 
   ggplot(aes(lon, lat)) +
   geom_point(aes(color =  mean)) + 
-  scale_color_divergent(name = "Diferencia de \nla media del ensamble", limits = c(-7, 7)) +
+  scale_color_divergent(name = "Diferencia con \nla media del ensamble", limits = c(-7, 7)) +
   coord_fixed() +
   theme(legend.position="bottom")
 
@@ -241,7 +229,7 @@ fcst[, .(rmse = sqrt(mean((obs - fcst)^2))), by = .(lon, lat)] %>%
   
 ```
 
-Y mirando la relación entre las observaciones y el pronóstico se ve que si bien hay una relación directa y la mayoría d elos puntos se ubican cerca de la recta hay una región donde se ve que el pronóstico sobre estima a las observaciones y algunos puntos anómalos que podrían corresponde a estaciones con problemas sistemáticos.
+Y mirando la relación entre las observaciones y el pronóstico se ve que si bien hay una relación directa y la mayoría de los puntos se ubican cerca de la recta hay una región donde se ve que el pronóstico sobre estima a las observaciones y algunos puntos anómalos que podrían corresponde a estaciones con problemas sistemáticos.
 
 ```{r}
 ggplot(fcst, aes(obs, fcst)) + 
@@ -259,6 +247,17 @@ fcst[obs < 298 & fcst > 302] %>%
 ```
 
 
+### Fcst
+
+```{r}
+fcst <- ReadNetCDF("../obs_RRA/20181122_00F/NPP_2018-11-22_00_FC18.nc", vars = c("XLONG", "XLAT", "MDBZ"))
+
+fcst[ens %in% c(1:10)] %>% 
+ggplot(aes(lon, lat)) +
+  geom_point(aes(color = MDBZ)) +
+  scale_color_viridis_c(limits = c(0, 50)) +
+  facet_wrap(~ens, ncol = 5)
+```
 
 
 

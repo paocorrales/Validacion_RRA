@@ -1,0 +1,68 @@
+---
+title: "03_graficos"
+author: "Pao"
+date: "8/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+```
+
+## Todas las observaciones
+
+Veamos si la compu explota cuando leo todas las observaciones asimiladas
+
+```{r}
+all <- fread("data/filtradas/obs_all.csv") 
+
+all[, time := ymd_hms(time)] %>% 
+  .[, time.obs := ymd_hms(time.obs)]
+
+
+
+obs_type <- c("1" = "ADPUPA",
+              "3" = "AIRCFT",
+              "4" = "SATWND",
+              "8" = "ADPSFC",
+              "9" = "SFCSHP",
+              "12" = "RADAR",
+              "20" = "ASCATW",
+              "21" = "AIRS",
+              "22" = "ADPAUT",
+              "23" = "GNSS")
+```
+
+ADPUPA = 1 (sondeos)
+AIRCFT = 3 (aviones)
+SATWND = 4 (vectores de satélite geoestacionario)
+ADPSFC = 8 (estaciones de superficie)
+SFCSHP = 9 (barcos y boyas)
+ASCATW = 20 (vientos de ASCAT)
+AIRS = 21 (perfiles de satélite AIRS)
+ADPAUT=22 (estaciones automáticas-> las incluimos nosotros)
+GNSS=23 (Global Network … -> las incluimos nosotros)
+
+```{r}
+all[, .N, by = .(sub.id, hour(time.obs))] %>% 
+  ggplot(aes(hour, factor(sub.id))) +
+  geom_point(aes(size =  N, color = N)) +
+  scale_color_viridis_c() +
+  scale_size_continuous(guide = "none") +
+  scale_y_discrete(name = "type of observation", labels = obs_type) +
+  scale_x_continuous(name = "hour of the day", breaks = seq(0, 24, 3))
+```
+
+```{r}
+all[, .N, by = .(sub.id, hour(time.obs))] %>% 
+  ggplot(aes(hour, N)) +
+  geom_line(aes(color = factor(sub.id))) +
+  geom_point(aes(color = factor(sub.id))) +
+  scale_color_discrete(name = "type", labels =  obs_type) +
+  scale_y_log10()
+```
+
