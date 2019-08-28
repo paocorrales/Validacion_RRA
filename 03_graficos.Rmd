@@ -18,12 +18,14 @@ library(dplyr)
 Veamos si la compu explota cuando leo todas las observaciones asimiladas
 
 ```{r}
+mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Obs", "/mnt/Data/Validacion_RRA/data")
+
 all <- fread("data/filtradas/obs_all.csv") 
 
 all[, time := ymd_hms(time)] %>% 
   .[, time.obs := ymd_hms(time.obs)]
 
-
+mount$finalize()
 
 obs_type <- c("1" = "ADPUPA",
               "3" = "AIRCFT",
@@ -54,7 +56,8 @@ all[, .N, by = .(sub.id, hour(time.obs))] %>%
   scale_color_viridis_c() +
   scale_size_continuous(guide = "none") +
   scale_y_discrete(name = "type of observation", labels = obs_type) +
-  scale_x_continuous(name = "hour of the day", breaks = seq(0, 24, 3))
+  scale_x_continuous(name = "hour of the day", breaks = seq(0, 24, 3)) +
+  theme_minimal()
 ```
 
 ```{r}
@@ -65,4 +68,55 @@ all[, .N, by = .(sub.id, hour(time.obs))] %>%
   scale_color_discrete(name = "type", labels =  obs_type) +
   scale_y_log10()
 ```
+
+```{r}
+all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>% 
+  # .[sub.id != 12] %>% 
+  ggplot(aes(day, factor(sub.id))) +
+  geom_point(aes(color = N, size = N)) +
+  scale_color_viridis_c() +
+  scale_size_continuous(guide = "none") +
+  scale_y_discrete(name = "type of observation", labels = obs_type) +
+  scale_x_datetime(name = "date", date_breaks = "5 days", date_labels = "%m-%d") +
+  theme_minimal()
+
+all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>% 
+  .[sub.id != 12] %>% 
+  ggplot(aes(day, factor(sub.id))) +
+  geom_point(aes(color = N, size = N)) +
+  scale_color_viridis_c() +
+  scale_size_continuous(guide = "none") +
+  scale_y_discrete(name = "type of observation", labels = obs_type) +
+  scale_x_datetime(name = "date", date_breaks = "5 days", date_labels = "%m-%d") +
+  theme_minimal()
+
+all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>% 
+  .[!(sub.id %in% c(12, 22))] %>% 
+  ggplot(aes(day, factor(sub.id))) +
+  geom_point(aes(color = N, size = N)) +
+  scale_color_viridis_c() +
+  scale_size_continuous(guide = "none") +
+  scale_y_discrete(name = "type of observation", labels = obs_type) +
+  scale_x_datetime(name = "date", date_breaks = "5 days", date_labels = "%m-%d") +
+  theme_minimal()
+```
+
+### Pronosticos
+
+```{r}
+mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst", "/mnt/Data/Validacion_RRA/data")
+
+path <- "data/interpolados/fcst_83073_20181120_00.csv"
+out <- fread(path)
+
+fecha_ini <- ymd_h(stringr::str_extract(path, "\\d{8}_\\d{2}"))
+
+a <- out[, `:=`(obs.fcst = obs - fcst,
+           fecha.ini = fecha_ini,
+           verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>% 
+  .[, .(rmse = sqrt(mean(obs.fcst^2))), by = .(ens, verif)]
+  
+
+```
+
 
