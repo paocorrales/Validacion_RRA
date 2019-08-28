@@ -11,6 +11,8 @@ library(data.table)
 library(ggplot2)
 library(lubridate)
 library(dplyr)
+library(foreach)
+library(doParallel)
 ```
 
 ## Todas las observaciones
@@ -106,17 +108,29 @@ all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>%
 ```{r}
 mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst", "/mnt/Data/Validacion_RRA/data")
 
-path <- "data/interpolados/fcst_83073_20181120_00.csv"
-out <- fread(path)
+myCluster <- makeCluster(4)
+registerDoParallel(myCluster)
 
-fecha_ini <- ymd_h(stringr::str_extract(path, "\\d{8}_\\d{2}"))
+path <- "data/interpolados/fcst_83073_2018**"
+files <- Sys.glob(path)
 
-a <- out[, `:=`(obs.fcst = obs - fcst,
+out <- foreach(f = 1:length(files),
+               .packages = c("data.table", "lubridate", "dplyr"),
+               .export = c("files"),
+               .combine = "rbind") %dopar% { 
+
+cat("Leyendo el pronóstico ", basename(files[f]), "\n")                                  
+fcst <- fread(files[f])
+
+fecha_ini <- ymd_h(stringr::str_extract(files[f], "\\d{8}_\\d{2}"))
+
+temp <- fcst[, `:=`(obs.fcst = obs - fcst,
            fecha.ini = fecha_ini,
            verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>% 
-  .[, .(rmse = sqrt(mean(obs.fcst^2))), by = .(ens, verif)]
-  
+  .[, .(rmse = sqrt(mean(obs.fcst^2))), by = .(ens, verif, fecha.ini)]
+}
 
+fwrite(out, "rmse_83073.cs")
 ```
 
 
