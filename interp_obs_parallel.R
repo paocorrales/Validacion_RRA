@@ -50,7 +50,8 @@ system.time(out <- foreach(f = 1:length(files),
   sink("log.txt", append=TRUE)
 	
   cat("Interpolando el pronóstico ", basename(files[f]), "\n")
-  fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc))
+  fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc), 
+                     subset = list(lat = 5:145, lon = 5:95))
   
   time_verif <- fecha_ini + hours(f - 1)
   
