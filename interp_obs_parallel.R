@@ -20,7 +20,7 @@ library(interp)
 library(foreach)
 library(doParallel)
 
-myCluster <- makeCluster(20)
+myCluster <- makeCluster(10)
 registerDoParallel(myCluster)
 
 print(args)
