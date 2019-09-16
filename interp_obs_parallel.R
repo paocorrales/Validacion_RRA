@@ -68,11 +68,6 @@ system.time(out <- foreach(f = 1:length(files),
   temp[, lon := ConvertLongitude(lon)]
   temp <- merge(temp, obs_subset, by = c("lon", "lat", "time.obs", "time.slot"), allow.cartesian = TRUE)
 
-  # if (f == 1) {
-  #   out <- temp
-  # } else {
-  #   out <- rbind(out, temp)
-  # }
 })
 
 stopCluster(myCluster)
