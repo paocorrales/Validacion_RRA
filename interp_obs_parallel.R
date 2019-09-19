@@ -49,7 +49,7 @@ system.time(out <- foreach(f = 1:length(files),
 
   sink("log.txt", append=TRUE)
 	
-  cat("Interpolando el pronóstico ", basename(files[f]), "\n")
+  cat("Interpolando el pronóstico ", basename(files[f]), "para la variable ", var_nc, "\n")
   fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc), 
                      subset = list(lat = 5:145, lon = 5:95))
   
@@ -58,7 +58,7 @@ system.time(out <- foreach(f = 1:length(files),
   obs_subset <- subset(obs, time.obs == time_verif)
   
   # Interpolo
-  temp <- fcst[, c(interp(XLONG, XLAT, T2, output = "points", 
+  temp <- fcst[, c(interp(XLONG, XLAT, .SD[[var_nc]], output = "points", 
                           xo = ConvertLongitude(obs_subset$lon), yo = obs_subset$lat),
                    list(time.slot = obs_subset$time.slot)),
                by = ens] %>% 
@@ -71,8 +71,10 @@ system.time(out <- foreach(f = 1:length(files),
 })
 
 stopCluster(myCluster)
+path_out <- paste0("/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv")
 
-fwrite(out, paste0("/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv"))
+print(paste0("Guardo el archivo ", path_out))
+fwrite(out, path_out)
 
 
 

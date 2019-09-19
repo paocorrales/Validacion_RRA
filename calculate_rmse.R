@@ -27,4 +27,4 @@ temp <- fcst[, `:=`(obs.fcst = obs - fcst,
   .[, .(rmse = sqrt(mean(obs.fcst^2)), bias = mean(obs.fcst)), by = .(ens, verif, fecha.ini)]
 }
 
-fwrite(out, "rmse_83073.cs")
+fwrite(out, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/rmse_83073.csv")
