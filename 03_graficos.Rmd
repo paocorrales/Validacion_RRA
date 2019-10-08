@@ -101,29 +101,29 @@ all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>%
 ```{r}
 mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst", "/mnt/Data/Validacion_RRA/data")
 
-# myCluster <- makeCluster(4)
-# registerDoParallel(myCluster)
-# 
-# path <- "data/interpolados/fcst_83073_2018**"
-# files <- Sys.glob(path)
-# 
-# out <- foreach(f = 1:length(files),
-#                .packages = c("data.table", "lubridate", "dplyr"),
-#                .export = c("files"),
-#                .combine = "rbind") %dopar% { 
-# 
-# cat("Leyendo el pronóstico ", basename(files[f]), "\n")                                  
-# fcst <- fread(files[f])
-# 
-# fecha_ini <- ymd_h(stringr::str_extract(files[f], "\\d{8}_\\d{2}"))
-# 
-# temp <- fcst[, `:=`(obs.fcst = obs - fcst,
-#            fecha.ini = fecha_ini,
-#            verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>% 
-#   .[, .(rmse = sqrt(mean(obs.fcst^2))), by = .(ens, verif, fecha.ini)]
-# }
-# 
-# fwrite(out, "rmse_83073.cs")
+myCluster <- makeCluster(6)
+registerDoParallel(myCluster)
+
+path <- "data/interpolados/fcst_83073_2018**"
+files <- Sys.glob(path)
+
+out <- foreach(f = 1:length(files),
+               .packages = c("data.table", "lubridate", "dplyr"),
+               .export = c("files"),
+               .combine = "rbind") %dopar% {
+
+cat("Leyendo el pronóstico ", basename(files[f]), "\n")
+fcst <- fread(files[f])
+
+fecha_ini <- ymd_h(stringr::str_extract(files[f], "\\d{8}_\\d{2}"))
+
+temp <- fcst[, `:=`(obs.fcst = obs - fcst,
+           fecha.ini = fecha_ini,
+           verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>%
+ .[, .(rmse = sqrt(mean(obs.fcst^2)), bias = mean(obs.fcst)), by = .(ens, verif, fecha.ini)]
+}
+
+ fwrite(out, "rmse_bias_83073.csv")
 
 ```
 

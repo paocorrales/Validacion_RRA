@@ -18,13 +18,6 @@ library(metR)
 library(dplyr)
 library(interp)
 
-# for (i in length(args)) {
-#   print(length(args))
-#   print(args[i])
-#   print(class(args[i]))
-# }
-
-
 filepath_nc <- paste0(args[1], "/*.nc")
 filepath_obs <- args[2]
 var_rra <- args[3]
@@ -44,7 +37,8 @@ files <- Sys.glob(filepath_nc)
 
 for (f in 1:length(files)) { 
 
-  fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc))
+  fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc),
+                     subset = list(lat = 5:145, lon = 5:95))
   
   print(basename(files[f]))
   time_verif <- fecha_ini + hours(f - 1)
@@ -53,7 +47,7 @@ for (f in 1:length(files)) {
   obs_subset <- subset(obs, time.obs == time_verif)
   
   # Interpolo
-  temp <- fcst[, c(interp(XLONG, XLAT, T2, output = "points", 
+  temp <- fcst[, c(interp(XLONG, XLAT, .SD[[var_nc]], output = "points", 
                           xo = ConvertLongitude(obs_subset$lon), yo = obs_subset$lat),
                    list(time.slot = obs_subset$time.slot)),
                by = ens] %>% 
