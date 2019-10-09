@@ -24,7 +24,8 @@ out <- foreach(f = 1:length(files),
                  temp <- fcst[, `:=`(obs.fcst = obs - fcst,
                                      fecha.ini = fecha_ini,
                                      verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>%
-                   .[, .(rmse = sqrt(mean(obs.fcst^2)), bias = mean(obs.fcst)), by = .(ens, verif, fecha.ini)]
+                   .[, .(rmse = sqrt(mean(obs.fcst^2, na.rm = TRUE)), 
+                         bias = mean(obs.fcst, na.rm = TRUE)), by = .(ens, verif, fecha.ini)]
                }
 
 fwrite(out, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/rmse_83073.csv")
