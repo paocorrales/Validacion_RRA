@@ -52,11 +52,11 @@ system.time(out <- foreach(f = 1:length(files),
   cat("Interpolando el pronóstico ", basename(files[f]), "para la variable ", var_nc, "\n")
   fcst <- ReadNetCDF(files[f], vars = c("XLONG", "XLAT", var_nc), 
                      subset = list(lat = 5:145, lon = 5:95))
-  
+
   time_verif <- fecha_ini + hours(f - 1)
   
   obs_subset <- subset(obs, time.obs == time_verif)
-  
+
   # Interpolo
   temp <- fcst[, c(interp(XLONG, XLAT, .SD[[var_nc]], output = "points", 
                           xo = ConvertLongitude(obs_subset$lon), yo = obs_subset$lat),
@@ -67,7 +67,6 @@ system.time(out <- foreach(f = 1:length(files),
 
   temp[, lon := ConvertLongitude(lon)]
   temp <- merge(temp, obs_subset, by = c("lon", "lat", "time.obs", "time.slot"), allow.cartesian = TRUE)
-
 })
 
 stopCluster(myCluster)
