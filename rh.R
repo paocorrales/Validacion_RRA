@@ -1,4 +1,5 @@
 #Calculo de RH según LETKF
+#Ojo: Presión en pascales, humedad en g/g y temperatura en K!
 
 rh <- function(t, q, p) { 
 
@@ -14,17 +15,11 @@ e <- q * p * 0.01 / (0.378 * q + 0.622)
 
 tc <-  t - t0
 
-if (tc >= 0.0) { 
-  es <- e0c * exp(al*tc/(bl + tc))
-} else if (tc <= -15.0) { 
-  es <- e0i * exp(ai*tc/(bi + tc))
-} else { 
-  es <- e0c * exp(al*tc/(bl + tc)) * (15.0+tc)/15.0 + 
-    e0i * exp(ai*tc/(bi + tc)) * (-tc) / 15.0
-}
+es <- case_when(tc >= 0 ~ e0c * exp(al*tc/(bl + tc)),
+                tc <= -15 ~ e0i * exp(ai*tc/(bi + tc)),
+                TRUE ~ e0c * exp(al*tc/(bl + tc)) * (15.0+tc)/15.0 + e0i * exp(ai*tc/(bi + tc)) * (-tc) / 15.0)
 
 return(e/es) 
-
 } 
 
 
