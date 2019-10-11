@@ -19,7 +19,7 @@ library(dplyr)
 library(interp)
 library(foreach)
 library(doParallel)
-source("rh.R")
+source("/home/paola.corrales/Validacion_RRA/rh.R")
 
 myCluster <- makeCluster(10)
 registerDoParallel(myCluster)
@@ -45,7 +45,7 @@ files <- Sys.glob(filepath_nc)
 
 system.time(out <- foreach(f = 1:length(files),
                .packages = c("data.table", "metR", "lubridate", "interp", "dplyr"),
-               .export = c("files", "obs", "fecha_ini", "var_nc", "var_rra"),
+               .export = c("files", "obs", "fecha_ini", "var_nc", "var_rra", "rh"),
                .combine = "rbind") %dopar% { 
 
   sink("log.txt", append=TRUE)
