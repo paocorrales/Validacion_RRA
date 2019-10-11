@@ -11,8 +11,7 @@ library(data.table)
 library(ggplot2)
 library(lubridate)
 library(dplyr)
-library(foreach)
-library(doParallel)
+library(stringr)
 ```
 
 ## Todas las observaciones
@@ -51,97 +50,123 @@ AIRS = 21 (perfiles de satélite AIRS)
 ADPAUT=22 (estaciones automáticas-> las incluimos nosotros)
 GNSS=23 (Global Network … -> las incluimos nosotros)
 
-```{r}
-all[, .N, by = .(sub.id, hour(time.obs))] %>% 
-  ggplot(aes(hour, factor(sub.id))) +
-  geom_point(aes(size =  N, color = N)) +
-  scale_color_viridis_c(name = "count", #trans = "log",
-                        guide="legend") +
-  scale_size_continuous(guide = "none") +
-  scale_y_discrete(name = "type of observation", labels = obs_type) +
-  scale_x_continuous(name = "hour of the day", breaks = seq(0, 24, 3)) +
-  theme_minimal()
+Vamos a intentar crear una paleta a mano usando los colores de viridis pero con intervalos acordes a los datos.
 
+```{r}
+colores <- viridisLite::viridis(13, direction = 1)  
+# plot(prismatic::color(colores))
+```
+
+
+
+```{r}
+breakes <- c(10e3, 50000, 100000, 250000, 500000, 750000, 1000000)
 all[, .N, by = .(sub.id, hour(time.obs))] %>% 
   ggplot(aes(hour, factor(sub.id))) +
   geom_point(aes(size =  N, color = N)) +
-  scale_color_viridis_c(name = "count", trans = "log",
-                        guide="legend") +
+  scale_color_gradientn(name = NULL,
+                        colours = colores, 
+                        values = c(0, 0.01, 0.015, 0.02, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1),
+                        breaks = breakes, labels = scales::scientific) +
   scale_size_continuous(guide = "none") +
   scale_y_discrete(name = "type of observation", labels = obs_type) +
   scale_x_continuous(name = "hour of the day", breaks = seq(0, 24, 3)) +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.key.height = unit(15, "mm"),
+        legend.key.width = unit(2, "mm"), 
+        aspect.ratio = 0.5)
 ```
 
 
 ```{r}
-all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>% 
-  # .[sub.id != 12] %>% 
+breakes <- c(1000, 100000, 250000, 500000, 1000000, 1500000, 2000000)
+all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>%
   ggplot(aes(day, factor(sub.id))) +
   geom_point(aes(color = N, size = N)) +
-  scale_color_viridis_c() +
+  scale_color_gradientn(name = NULL,
+                        colours = colores, 
+                        values = c(0, 0.0005, 0.001, 0.0015, 0.002, 0.01, 0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1),
+                        breaks = breakes, labels = scales::scientific) +
   scale_size_continuous(guide = "none") +
   scale_y_discrete(name = "type of observation", labels = obs_type) +
   scale_x_datetime(name = "date", date_breaks = "5 days", date_labels = "%m-%d") +
-  theme_minimal()
-
-all[, .N, by = .(sub.id, day = floor_date(time.obs, "day"))] %>% 
-  # .[sub.id != 12] %>% 
-  ggplot(aes(day, factor(sub.id))) +
-  geom_point(aes(color = N, size = N)) +
-  scale_color_viridis_c(trans = "log") +
-  scale_size_continuous(guide = "none") +
-  scale_y_discrete(name = "type of observation", labels = obs_type) +
-  scale_x_datetime(name = "date", date_breaks = "5 days", date_labels = "%m-%d") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.key.height = unit(15, "mm"),
+        legend.key.width = unit(2, "mm"), 
+        aspect.ratio = 0.5)
 ```
+
+```{r}
+all[, var := case_when(obs.id %in% c(2819, 82819) ~ "u",
+                       obs.id %in% c(2820, 82820) ~ "v",
+                       obs.id %in% c(3073, 83073) ~ "t",
+                       obs.id %in% c(3330, 83330) ~ "q",
+                       obs.id %in% c(3331, 83331) ~ "rh",
+                       obs.id %in% c(4001) ~ "dBz",
+                       obs.id %in% c(14593) ~ "p")] %>% 
+  .[, source := case_when(sub.id == 1 ~ "ADPUPA",
+                          sub.id == 3 ~ "AIRCFT",
+                          sub.id == 4 ~ "SATWND",
+                          sub.id == 8 ~ "ADPSFC",
+                          sub.id == 9 ~ "SFCSHP",
+                          sub.id == 12 ~ "RADAR",
+                          sub.id == 20 ~ "ASCATW",
+                          sub.id == 21 ~ "AIRS",
+                          sub.id == 22 ~ "ADPAUT",
+                          sub.id == 23 ~ "GNSS")]
+                       
+
+tabla <- all[, .N, by  = .(var, source)] %>% 
+  dcast(source ~ var)
+
+knitr::kable(tabla)
+```
+
 
 ### Pronosticos
 
+
 ```{r}
-mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst", "/mnt/Data/Validacion_RRA/data")
+mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
 
-myCluster <- makeCluster(6)
-registerDoParallel(myCluster)
+files <- Sys.glob("data/*.csv")
 
-path <- "data/interpolados/fcst_83073_2018**"
-files <- Sys.glob(path)
+estadisticos <- lapply(files, function(f) {
+  var <- str_extract(f, "\\d{5}")
+  fread(f) %>% 
+    .[, var := var] %>% 
+    .[]
+} ) %>% 
+  rbindlist() 
 
-out <- foreach(f = 1:length(files),
-               .packages = c("data.table", "lubridate", "dplyr"),
-               .export = c("files"),
-               .combine = "rbind") %dopar% {
+estadisticos <- copy(estadisticos) %>% 
+  .[, .(rmse = mean(rmse),
+           bias = mean(bias)), by = .(verif, fecha.ini, var)] %>%
+  .[, ens := 0] %>% 
+  rbind(estadisticos) %>% 
+  melt(measure.vars = c("rmse", "bias"), variable.name  = "estadistico")
 
-cat("Leyendo el pronóstico ", basename(files[f]), "\n")
-fcst <- fread(files[f])
-
-fecha_ini <- ymd_h(stringr::str_extract(files[f], "\\d{8}_\\d{2}"))
-
-temp <- fcst[, `:=`(obs.fcst = obs - fcst,
-           fecha.ini = fecha_ini,
-           verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>%
- .[, .(rmse = sqrt(mean(obs.fcst^2)), bias = mean(obs.fcst)), by = .(ens, verif, fecha.ini)]
-}
-
- fwrite(out, "rmse_bias_83073.csv")
-
+mount$finalize()
 ```
 
 ```{r}
-rmse <- fread("data/estadisticos/rmse_83073.csv") %>% 
-  .[, fecha.ini := as_datetime(fecha.ini)] %>% 
-  .[, fecha.verif := fecha.ini + hours(verif)]
+estadisticos[var == 83331, .(value = mean(value)), by = .(verif, ens, estadistico)] %>%
+  ggplot(aes(verif, value)) +
+  geom_line(aes(color = factor(estadistico), group = interaction(estadistico, ens), alpha = ens == 0)) +
+  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+  scale_color_discrete(name = NULL) +
+  geom_hline(yintercept = 0, color = "darkgray")
+```
 
+
+```{r eval=FALSE, include=FALSE}
 rmse %>% 
   ggplot(aes(verif, rmse)) +
   geom_line(aes(group = interaction(fecha.ini, ens)), alpha = 0.02, size = 0.1) +
   labs(title = "RMSE de cada miembro del emsable, de cada ciclo de pronóstico",
        x = "Plazo de verificación")
-```
 
 
-
-```{r}
 #Promedio sobre cada fecha de verificación
 dt <- rmse[, fecha := fecha.ini + hours(verif)] %>% 
   .[, list(mean.rmse = mean(rmse), sd.rmse = sd(rmse)), by = .(fecha)] %>% 
@@ -166,7 +191,7 @@ rbind(dt, dt2) %>%
 
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 #Promedio sobre cada fecha de verificación
 dt <- rmse[, fecha := fecha.ini + hours(verif)] %>% 
   .[, list(mean.rmse = mean(rmse), sd.rmse = sd(rmse)), by = .(fecha, verif)] %>% 
@@ -187,7 +212,7 @@ dt[verif %in% c(0, 12, 24, 36)] %>%
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 copy(rmse) %>% 
   .[, list(mean.rmse = mean(rmse), sd.rmse = sd(rmse)), by = .(hour(fecha.ini), verif)] %>%
