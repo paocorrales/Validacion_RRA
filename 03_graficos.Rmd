@@ -6,13 +6,15 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,
-                      cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
 library(data.table)
 library(ggplot2)
 library(lubridate)
 library(dplyr)
 library(stringr)
+library(metR)
+
+map <- rnaturalearth::ne_states(country = c("argentina", "Brazil", "Chile", "Uruguay", "Paraguay", "Bolivia"), returnclass = "sf")
 ```
 
 ## Todas las observaciones
@@ -130,7 +132,7 @@ knitr::kable(tabla)
 ```{r}
 mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
 
-files <- Sys.glob("data/*.csv")
+files <- Sys.glob("data/rmse*")
 
 estadisticos <- lapply(files, function(f) {
   var <- str_extract(f, "\\d{5}")
@@ -172,6 +174,82 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   facet_grid(var.type ~ hora.ini, scales = "free_y") +
   theme_minimal()
 ```
+
+## Espacial
+
+```{r}
+mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
+
+files <- Sys.glob("data/espacial*")
+
+est_espacial <- lapply(files, function(f) {
+  var <- str_extract(f, "\\d{5}")
+  fread(f) %>% 
+    .[, var := var] %>%
+    .[, fecha.ini := ymd_hms(fecha.ini)] %>%
+    .[]
+} ) %>% 
+  rbindlist() 
+
+mount$finalize()
+
+est_espacial[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
+                       var %in% c(2820, 82820) ~ "v",
+                       var %in% c(3073, 83073) ~ "t",
+                       var %in% c(3330, 83330) ~ "q",
+                       var %in% c(3331, 83331) ~ "rh",
+                       var %in% c(4001) ~ "dBz",
+                       var %in% c(14593) ~ "p")]
+
+```
+
+```{r}
+est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
+  .[verif %in% c(0, 6, 12, 18, 24) & rmse.mean < 10] %>% 
+  na.omit() %>% 
+  ggplot(aes(ConvertLongitude(lon), lat)) +
+  geom_point(aes(color = rmse.mean, size = rmse.mean)) +
+  scale_color_viridis_c("RMSE") +
+  scale_size_area(max_size = 4) +
+  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
+  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
+  labs(x = "Longitude", y = "Latitude") +
+  facet_wrap(~ verif) +
+  theme_minimal() 
+```
+
+Algunas estaciones parecen ser sistemáticamente malas. 
+
+```{r}
+library(patchwork)
+est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
+  .[verif %in% c(24) & rmse.mean < 10] %>% 
+  na.omit() %>% 
+  ggplot(aes(ConvertLongitude(lon), lat)) +
+  geom_point(aes(color = rmse.mean, size = rmse.mean)) +
+  scale_color_viridis_c("RMSE") +
+  scale_size_area(max_size = 4, guide =  "none") +
+  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
+  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+    
+est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
+  .[verif %in% c(24) & rmse.mean < 10] %>% 
+  na.omit() %>% 
+  ggplot(aes(ConvertLongitude(lon), lat)) +
+  geom_point(aes(color = bias.mean, size = bias.mean)) +
+  scale_color_divergent("Bias") +
+  scale_size_area(max_size = 4, guide =  "none") +
+  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
+  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_minimal() 
+```
+
 
 
 ```{r eval=FALSE, include=FALSE}
