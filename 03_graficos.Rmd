@@ -6,7 +6,8 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE)
 library(data.table)
 library(ggplot2)
 library(lubridate)
@@ -135,6 +136,7 @@ estadisticos <- lapply(files, function(f) {
   var <- str_extract(f, "\\d{5}")
   fread(f) %>% 
     .[, var := var] %>% 
+    .[, fecha.ini := ymd_hms(fecha.ini)] %>% 
     .[]
 } ) %>% 
   rbindlist() 
@@ -147,15 +149,28 @@ estadisticos <- copy(estadisticos) %>%
   melt(measure.vars = c("rmse", "bias"), variable.name  = "estadistico")
 
 mount$finalize()
+
+estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
+                       var %in% c(2820, 82820) ~ "v",
+                       var %in% c(3073, 83073) ~ "t",
+                       var %in% c(3330, 83330) ~ "q",
+                       var %in% c(3331, 83331) ~ "rh",
+                       var %in% c(4001) ~ "dBz",
+                       var %in% c(14593) ~ "p")]
 ```
 
 ```{r}
-estadisticos[var == 83331, .(value = mean(value)), by = .(verif, ens, estadistico)] %>%
+estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico)] %>%
   ggplot(aes(verif, value)) +
   geom_line(aes(color = factor(estadistico), group = interaction(estadistico, ens), alpha = ens == 0)) +
   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
-  scale_color_discrete(name = NULL) +
-  geom_hline(yintercept = 0, color = "darkgray")
+  scale_color_brewer(name = NULL, type = "qual", palette = "Dark2") +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast Time (hours)") +
+  scale_y_continuous(name = NULL) +
+  facet_grid(var.type ~ hora.ini, scales = "free_y") +
+  theme_minimal()
 ```
 
 
