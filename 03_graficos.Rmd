@@ -190,6 +190,7 @@ est_espacial <- lapply(files, function(f) {
   tmp <- fread(f) %>% 
     .[, var := var] %>%
     .[, fecha.ini := ymd_hms(fecha.ini)] %>%
+    .[, hora.ini := hour(fecha.ini)] %>%
     .[]
   mount$finalize()
   return(tmp)
@@ -229,8 +230,8 @@ Algunas estaciones parecen ser sistemáticamente malas.
 ```{r}
 
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, verif, lon, lat)] %>% 
-  .[verif %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
   na.omit() %>% 
   ggplot(aes(ConvertLongitude(lon), lat)) +
   geom_point(aes(color = rmse.mean)) +
@@ -239,7 +240,7 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
   coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
   labs(x = "Longitude", y = "Latitude") +
-  facet_grid(var.type ~ verif) +
+  facet_grid(var.type ~ hora.ini) +
   theme_minimal() 
     
 
@@ -247,8 +248,8 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
 
 ```{r}
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, verif, lon, lat)] %>% 
-  .[verif %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
   na.omit() %>% 
   ggplot(aes(ConvertLongitude(lon), lat)) +
   geom_point(aes(color = bias.mean)) +
@@ -257,7 +258,7 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
   coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
   labs(x = "Longitude", y = "Latitude") +
-  facet_grid(var.type ~ verif) +
+  facet_grid(var.type ~ hora.ini) +
   theme_minimal() 
 ```
 
