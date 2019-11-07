@@ -182,12 +182,17 @@ mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/hom
 
 files <- Sys.glob("data/espacial*")
 
+mount$finalize()
+
 est_espacial <- lapply(files, function(f) {
   var <- str_extract(f, "\\d{5}")
-  fread(f) %>% 
+  mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
+  tmp <- fread(f) %>% 
     .[, var := var] %>%
     .[, fecha.ini := ymd_hms(fecha.ini)] %>%
     .[]
+  mount$finalize()
+  return(tmp)
 } ) %>% 
   rbindlist() 
 
@@ -222,34 +227,39 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
 Algunas estaciones parecen ser sistemáticamente malas. 
 
 ```{r}
-library(patchwork)
+
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
-  .[verif %in% c(24) & rmse.mean < 10] %>% 
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, verif, lon, lat)] %>% 
+  .[verif %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
   na.omit() %>% 
   ggplot(aes(ConvertLongitude(lon), lat)) +
-  geom_point(aes(color = rmse.mean, size = rmse.mean)) +
+  geom_point(aes(color = rmse.mean)) +
   scale_color_viridis_c("RMSE") +
-  scale_size_area(max_size = 4, guide =  "none") +
+  # scale_size_area(max_size = 4, guide =  "none") +
   geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
   coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
   labs(x = "Longitude", y = "Latitude") +
-  theme_minimal() +
-    
-est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
-  .[verif %in% c(24) & rmse.mean < 10] %>% 
-  na.omit() %>% 
-  ggplot(aes(ConvertLongitude(lon), lat)) +
-  geom_point(aes(color = bias.mean, size = bias.mean)) +
-  scale_color_divergent("Bias") +
-  scale_size_area(max_size = 4, guide =  "none") +
-  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
-  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
-  labs(x = "Longitude", y = "Latitude") +
+  facet_grid(var.type ~ verif) +
   theme_minimal() 
+    
+
 ```
 
+```{r}
+est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, verif, lon, lat)] %>% 
+  .[verif %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
+  na.omit() %>% 
+  ggplot(aes(ConvertLongitude(lon), lat)) +
+  geom_point(aes(color = bias.mean)) +
+  scale_color_divergent("Bias") +
+  # scale_size_area(max_size = 4, guide =  "none") +
+  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
+  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
+  labs(x = "Longitude", y = "Latitude") +
+  facet_grid(var.type ~ verif) +
+  theme_minimal() 
+```
 
 
 ```{r eval=FALSE, include=FALSE}
