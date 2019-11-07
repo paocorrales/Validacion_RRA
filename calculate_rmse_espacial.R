@@ -23,8 +23,8 @@ out <- foreach(f = 1:length(files),
                  temp <- fcst[, `:=`(obs.fcst = obs - fcst,
                                      fecha.ini = fecha_ini,
                                      verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>%
-		   .[, obs.fcst := mean(obs.fcst, na.rm = TRUE), by = .(verif, fecha.ini, lon, lat)] %>%
-                   .[, .(rmse = sqrt(mean(obs.fcst^2, na.rm = TRUE)), 
+		   #.[, obs.fcst := mean(obs.fcst, na.rm = TRUE), by = .(verif, fecha.ini, lon, lat)] %>%
+                   .[, `:=`(rmse = sqrt(mean(obs.fcst^2, na.rm = TRUE)), 
                          bias = mean(obs.fcst, na.rm = TRUE)), by = .(verif, fecha.ini, lon, lat)]
                }
 
