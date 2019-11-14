@@ -161,8 +161,11 @@ estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
                        var %in% c(14593) ~ "p")]
 ```
 
+
+
 ```{r}
 estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[var.type != "rh"] %>% 
   .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico)] %>%
   ggplot(aes(verif, value)) +
   geom_line(aes(color = factor(estadistico), group = interaction(estadistico, ens), alpha = ens == 0)) +
@@ -172,16 +175,14 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   scale_x_continuous("Forecast Time (hours)") +
   scale_y_continuous(name = NULL) +
   facet_grid(var.type ~ hora.ini, scales = "free_y") +
-  theme_minimal()
+  theme_linedraw(base_size = 16) 
 ```
 
 ## Espacial
 
 ```{r}
 mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
-
 files <- Sys.glob("data/espacial*")
-
 mount$finalize()
 
 est_espacial <- lapply(files, function(f) {
@@ -197,8 +198,6 @@ est_espacial <- lapply(files, function(f) {
 } ) %>% 
   rbindlist() 
 
-mount$finalize()
-
 est_espacial[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
                        var %in% c(2820, 82820) ~ "v",
                        var %in% c(3073, 83073) ~ "t",
@@ -209,29 +208,13 @@ est_espacial[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
 
 ```
 
-```{r}
-est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
-  .[verif %in% c(0, 6, 12, 18, 24) & rmse.mean < 10] %>% 
-  na.omit() %>% 
-  ggplot(aes(ConvertLongitude(lon), lat)) +
-  geom_point(aes(color = rmse.mean, size = rmse.mean)) +
-  scale_color_viridis_c("RMSE") +
-  scale_size_area(max_size = 4) +
-  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
-  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
-  labs(x = "Longitude", y = "Latitude") +
-  facet_wrap(~ verif) +
-  theme_minimal() 
-```
-
 Algunas estaciones parecen ser sistemáticamente malas. 
 
 ```{r}
 
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
                  bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
-  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
+  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5] %>% 
   na.omit() %>% 
   ggplot(aes(ConvertLongitude(lon), lat)) +
   geom_point(aes(color = rmse.mean)) +
@@ -260,6 +243,55 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   labs(x = "Longitude", y = "Latitude") +
   facet_grid(var.type ~ hora.ini) +
   theme_minimal() 
+```
+
+```{r}
+
+est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type == "t"] %>% 
+  na.omit() %>% 
+  melt(measure.var = c("rmse.mean", "bias.mean")) %>% 
+  ggplot(aes(ConvertLongitude(lon), lat)) +
+  geom_point(data = function(x) x[variable == "rmse.mean"], aes(color = value)) +
+  scale_color_viridis_c("RMSE") +
+  ggnewscale::new_scale_color() +
+  geom_point(data = function(x) x[variable == "bias.mean"], aes(color = value)) +
+  scale_color_divergent("Bias") +  
+  # scale_size_area(max_size = 4, guide =  "none") +
+  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
+  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
+  scale_x_continuous(labels = ) +
+  labs(x = "Longitude", y = "Latitude") +
+  facet_grid(variable ~ hora.ini) +
+  theme_linedraw(base_size = 16) +
+  theme(strip.text.y = element_blank())
+
+
+```
+
+
+```{r}
+estaciones_flojas <- est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+  .[verif == 0 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean > 5 & var.type == "t"] %>%
+  .[, mean(rmse.mean), by = .(lon, lat)] 
+
+temp_flojas <- all[obs.id == 83073 & lon %in% estaciones_flojas$lon] 
+
+temp_flojas[, .N, by = .(lon, lat)] %>% 
+  inner_join(estaciones_flojas)
+  
+
+temp_flojas[lon == unique(lon)[2]] %>% 
+  ggplot(aes(time.obs, obs)) +
+  geom_line(aes(group = lon)) +
+  geom_point(aes(group = lon)) 
+
+temp_flojas[lon == unique(lon)[2] & day(time.obs) == 25] %>% 
+  ggplot(aes(time.obs, obs)) +
+  geom_line(aes(group = lon)) +
+  geom_point(aes(group = lon)) 
 ```
 
 
