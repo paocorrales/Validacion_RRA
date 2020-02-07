@@ -72,10 +72,10 @@ all[, .N, by = .(sub.id, hour(time.obs))] %>%
                         values = c(0, 0.01, 0.015, 0.02, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1),
                         breaks = breakes, labels = scales::scientific) +
   scale_size_continuous(guide = "none") +
-  scale_y_discrete(name = "type of observation", labels = obs_type) +
-  scale_x_continuous(name = "hour of the day", breaks = seq(0, 24, 3)) +
-  theme_minimal() +
-  theme(legend.key.height = unit(15, "mm"),
+  scale_y_discrete(name = "Type of observation", labels = obs_type) +
+  scale_x_continuous(name = "Hour of the day (UTC)", breaks = seq(0, 24, 3)) +
+  theme_linedraw(base_size = 16) +
+  theme(legend.key.height = unit(18, "mm"),
         legend.key.width = unit(2, "mm"), 
         aspect.ratio = 0.5)
 ```
@@ -123,6 +123,8 @@ tabla <- all[, .N, by  = .(var, source)] %>%
   dcast(source ~ var)
 
 knitr::kable(tabla)
+
+rm(all)
 ```
 
 
@@ -168,36 +170,45 @@ estadisticos <- estadisticos %>%
 
 # mount$finalize()
 
-estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
-                       var %in% c(2820, 82820) ~ "v",
-                       var %in% c(3073, 83073) ~ "t",
+estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
+                       var %in% c(2820, 82820) ~ "v10m",
+                       var %in% c(3073, 83073) ~ "T2m",
                        var %in% c(3330, 83330) ~ "q",
                        var %in% c(3331, 83331) ~ "rh",
                        var %in% c(4001) ~ "dBz",
-                       var %in% c(14593) ~ "p")]
+                       var %in% c(14593) ~ "PSFC")]
 ```
+
+
 
 ```{r}
 estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[var.type != "rh"] %>% 
   .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico)] %>%
   ggplot(aes(verif, value)) +
   geom_line(aes(color = factor(estadistico), group = interaction(estadistico, ens), alpha = ens == 0)) +
   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
-  scale_color_brewer(name = NULL, type = "qual", palette = "Dark2") +
+  scale_color_grey(name = NULL, start = 0, end = 0.5) +
   geom_hline(yintercept = 0, color = "darkgray") +
-  scale_x_continuous("Forecast Time (hours)") +
-  scale_y_continuous(name = NULL) +
-  facet_grid(var.type ~ hora.ini, scales = "free_y") +
-  theme_minimal()
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+  theme_linedraw(base_size = 16) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"), 
+        legend.position = c(.98, .15),
+        legend.box.background = element_rect(color = "black", size = 1),
+        legend.justification = c("right", "top"),
+        legend.margin = margin(0, 2, 2, 2))
 ```
 
 ## Espacial
 
 ```{r}
 mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
-
 files <- Sys.glob("data/espacial*")
-
 mount$finalize()
 
 est_espacial <- lapply(files, function(f) {
@@ -213,8 +224,6 @@ est_espacial <- lapply(files, function(f) {
 } ) %>% 
   rbindlist() 
 
-mount$finalize()
-
 est_espacial[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
                        var %in% c(2820, 82820) ~ "v",
                        var %in% c(3073, 83073) ~ "t",
@@ -225,29 +234,13 @@ est_espacial[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
 
 ```
 
-```{r}
-est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(verif, lon, lat)] %>% 
-  .[verif %in% c(0, 6, 12, 18, 24) & rmse.mean < 10] %>% 
-  na.omit() %>% 
-  ggplot(aes(ConvertLongitude(lon), lat)) +
-  geom_point(aes(color = rmse.mean, size = rmse.mean)) +
-  scale_color_viridis_c("RMSE") +
-  scale_size_area(max_size = 4) +
-  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
-  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56)) +
-  labs(x = "Longitude", y = "Latitude") +
-  facet_wrap(~ verif) +
-  theme_minimal() 
-```
-
 Algunas estaciones parecen ser sistemáticamente malas. 
 
 ```{r}
 
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
                  bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
-  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
+  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5] %>% 
   na.omit() %>% 
   ggplot(aes(ConvertLongitude(lon), lat)) +
   geom_point(aes(color = rmse.mean)) +
@@ -259,10 +252,6 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   facet_grid(var.type ~ hora.ini) +
   theme_minimal() 
     
-
-```
-
-```{r}
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
                  bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
   .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
@@ -276,6 +265,71 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   labs(x = "Longitude", y = "Latitude") +
   facet_grid(var.type ~ hora.ini) +
   theme_minimal() 
+
+```
+
+
+```{r}
+
+est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+  .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type == "t"] %>% 
+  na.omit() %>% 
+  melt(measure.var = c("rmse.mean", "bias.mean")) %>% 
+  ggplot(aes(ConvertLongitude(lon), lat)) +
+  geom_point(data = function(x) x[variable == "rmse.mean"], aes(color = value), size = 2) +
+  scale_color_viridis_c(name = NULL, guide = guide_colorbar(nbin = 10, 
+                                                            raster = FALSE,
+                                                            barheight = 10, 
+                                                            ticks = FALSE,
+                                                            order = 1), 
+                        breaks = seq(0, 5, 1), limits = c(NA, 5)) +
+  ggnewscale::new_scale_color() +
+  geom_point(data = function(x) x[variable == "bias.mean"], aes(color = value, shape = factor(sign(value))),
+             size = 2) +
+  scale_color_divergent(name = NULL,  guide = guide_colorstrip(label.hjust = unit(0.5, "cm"), 
+                                                               inside = TRUE,
+                                                               barheight = 10, 
+                                                               order = 10),
+                        breaks = seq(-3, 3, 1)) +  
+  scale_shape_discrete(guide = "none") +
+  # scale_size_area(max_size = 4, guide =  "none") +
+  geom_sf(data = map, inherit.aes = FALSE, fill = NA) +
+  coord_sf(ylim = c(-38, -25), xlim = c(-67, -56), label_axes = "-NE-" ) +
+  scale_x_continuous(name = NULL, breaks = seq(-67, -56, 3)) +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_grid(variable ~ hora.ini, switch = "y", 
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"),
+                                 variable = c("bias.mean" = "Bias",
+                                              "rmse.mean" = "RMSE"))) +
+  theme_linedraw(base_size = 20) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"))
+```
+
+
+```{r}
+estaciones_flojas <- est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
+                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+  .[verif == 0 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean > 5 & var.type == "t"] %>%
+  .[, mean(rmse.mean), by = .(lon, lat)] 
+
+temp_flojas <- all[obs.id == 83073 & lon %in% estaciones_flojas$lon] 
+
+temp_flojas[, .N, by = .(lon, lat)] %>% 
+  inner_join(estaciones_flojas)
+  
+
+temp_flojas[lon == unique(lon)[2]] %>% 
+  ggplot(aes(time.obs, obs)) +
+  geom_line(aes(group = lon)) +
+  geom_point(aes(group = lon)) 
+
+temp_flojas[lon == unique(lon)[2] & day(time.obs) == 25] %>% 
+  ggplot(aes(time.obs, obs)) +
+  geom_line(aes(group = lon)) +
+  geom_point(aes(group = lon)) 
 ```
 
 
