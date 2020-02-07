@@ -22,14 +22,16 @@ map <- rnaturalearth::ne_states(country = c("argentina", "Brazil", "Chile", "Uru
 Veamos si la compu explota cuando leo todas las observaciones asimiladas
 
 ```{r}
-mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Obs", "/mnt/Data/Validacion_RRA/data")
+# mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Obs", "/mnt/Data/Validacion_RRA/data")
 
-all <- fread("data/filtradas/obs_all.csv") 
+# all <- fread("data/filtradas/obs_all.csv") 
+
+all <- fread("/home/paola.corrales/datosmunin/RRA_Obs/filtradas/obs_all.csv") 
 
 all[, time := ymd_hms(time)] %>% 
   .[, time.obs := ymd_hms(time.obs)]
 
-mount$finalize()
+# mount$finalize()
 
 obs_type <- c("1" = "ADPUPA",
               "3" = "AIRCFT",
@@ -199,27 +201,67 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   theme(strip.background = element_rect(fill = "white"),
         strip.text = element_text(color = "black"), 
         legend.position = c(.98, .15),
-        legend.box.background = element_rect(color = "black", size = 1),
+        legend.box.background = element_rect(color = "darkgrey", size = 1),
         legend.justification = c("right", "top"),
         legend.margin = margin(0, 2, 2, 2))
+
+estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[var.type != "rh"] %>% 
+  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, fisica, estadistico)] %>%
+  # .[estadistico == "rmse"] %>% 
+  ggplot(aes(verif, value)) +
+  geom_line(aes(color = fisica, group = interaction(estadistico, fisica))) +
+  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+  # scale_color_grey(name = NULL, start = 0, end = 0.5) +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+  theme_linedraw(base_size = 16) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"))
+
+estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[var.type != "rh"] %>% 
+  .[hora.ini %in% c(0), .(value = mean(value)), 
+    by = .(var.type, hora.ini, verif, ens, estadistico, fisica)] %>%
+  # .[estadistico == "rmse"] %>% 
+  ggplot(aes(verif, value)) +
+  geom_line(aes(color = fisica, group = interaction(estadistico, ens))) +
+  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+  # scale_color_grey(name = NULL, start = 0, end = 0.5) +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_wrap(~var.type, scales = "free_y", switch = "y", 
+             ncol = 2,
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+  theme_linedraw(base_size = 16) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"))
 ```
 
 ## Espacial
 
 ```{r}
-mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
-files <- Sys.glob("data/espacial*")
-mount$finalize()
+# mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
+# files <- Sys.glob("data/espacial*")
+# mount$finalize()
+
+files <- Sys.glob("/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/espacial*")
 
 est_espacial <- lapply(files, function(f) {
   var <- str_extract(f, "\\d{5}")
-  mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
+  # mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
   tmp <- fread(f) %>% 
     .[, var := var] %>%
     .[, fecha.ini := ymd_hms(fecha.ini)] %>%
     .[, hora.ini := hour(fecha.ini)] %>%
     .[]
-  mount$finalize()
+  # mount$finalize()
   return(tmp)
 } ) %>% 
   rbindlist() 
@@ -309,7 +351,7 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 estaciones_flojas <- est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
                  bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
   .[verif == 0 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean > 5 & var.type == "t"] %>%
@@ -404,7 +446,4 @@ copy(rmse) %>%
 
 ```
 
-```{r}
-mount$finalize()
-```
 
