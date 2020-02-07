@@ -130,9 +130,11 @@ knitr::kable(tabla)
 
 
 ```{r}
-mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
+# mount <- mountr::sshfs_mount("paola.corrales", "yakaira.cima.fcen.uba.ar", "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos", "/mnt/Data/Validacion_RRA/data")
+# 
+# files <- Sys.glob("data/rmse*")
 
-files <- Sys.glob("data/rmse*")
+files <- Sys.glob("/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/rmse*")
 
 estadisticos <- lapply(files, function(f) {
   var <- str_extract(f, "\\d{5}")
@@ -143,14 +145,28 @@ estadisticos <- lapply(files, function(f) {
 } ) %>% 
   rbindlist() 
 
-estadisticos <- copy(estadisticos) %>% 
-  .[, .(rmse = mean(rmse),
-           bias = mean(bias)), by = .(verif, fecha.ini, var)] %>%
-  .[, ens := 0] %>% 
+fisica <- data.table(ens = 1:60, 
+                     fisica = rep(c("KF-YSU", 
+                                    "BMJ-YSU",
+                                    "GF-YSU",
+                                    "KF-MYJ",
+                                    "BMJ-MYJ",
+                                    "GF-MYJ",
+                                    "KF-MYNN2",
+                                    "BMJ-MYNN2",
+                                    "GF-MYNN2"), length.out = 60))
+
+estadisticos <- fisica[estadisticos, on = "ens"] 
+
+estadisticos <- estadisticos %>% 
+    .[, .(rmse = mean(rmse),
+           bias = mean(bias)), by = .(verif, fecha.ini, var, fisica)] %>%
+  .[, ":="(ens = 0,
+           fisica = "MEAN")] %>% 
   rbind(estadisticos) %>% 
   melt(measure.vars = c("rmse", "bias"), variable.name  = "estadistico")
 
-mount$finalize()
+# mount$finalize()
 
 estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
                        var %in% c(2820, 82820) ~ "v",
