@@ -33,16 +33,27 @@ all[, time := ymd_hms(time)] %>%
 
 # mount$finalize()
 
-obs_type <- c("1" = "ADPUPA",
-              "3" = "AIRCFT",
-              "4" = "SATWND",
-              "8" = "ADPSFC",
-              "9" = "SFCSHP",
-              "12" = "RADAR",
-              "20" = "ASCATW",
-              "21" = "AIRS",
-              "22" = "ADPAUT",
-              "23" = "GNSS")
+# obs_type <- c("1" = "ADPUPA",
+#               "3" = "AIRCFT",
+#               "4" = "SATWND",
+#               "8" = "ADPSFC",
+#               "9" = "SFCSHP",
+#               "12" = "RADAR",
+#               "20" = "ASCATW",
+#               "21" = "AIRS",
+#               "22" = "ADPAUT",
+#               "23" = "GNSS")
+
+# New obs_type
+obs_type <- c(
+  "22" = "ASWS",
+  "8" = "CSWS",
+  "1" = "RS",
+  "3" = "AIRPL",
+  "21" = "AIRSR",
+  "12" = "RADAR",
+  "4" = "GDMW",
+  "9" = "SHBU")
 ```
 
 ADPUPA = 1 (sondeos)
