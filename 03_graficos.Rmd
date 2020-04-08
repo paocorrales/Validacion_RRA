@@ -87,10 +87,12 @@ all[, .N, by = .(sub.id, hour(time.obs))] %>%
   scale_size_continuous(guide = "none") +
   scale_y_discrete(name = "Type of observation", labels = obs_type) +
   scale_x_continuous(name = "Hour of the day (UTC)", breaks = seq(0, 24, 3)) +
-  theme_linedraw(base_size = 16) +
+  theme_linedraw(base_size = 12) +
   theme(legend.key.height = unit(18, "mm"),
         legend.key.width = unit(2, "mm"), 
         aspect.ratio = 0.5)
+
+ggsave("fig/observaciones.eps", dpi = 300, width = 20, units = "cm")
 ```
 
 
@@ -208,13 +210,15 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
                                               "12" = "12 UTC", "18" = "18 UTC"))) +
-  theme_linedraw(base_size = 16) +
+  theme_linedraw(base_size = 12) +
   theme(strip.background = element_rect(fill = "white"),
-        strip.text = element_text(color = "black"), 
+        strip.text = element_text(color = "black"), panel.grid = element_line(color = "grey80"),
         legend.position = c(.98, .15),
-        legend.box.background = element_rect(color = "darkgrey", size = 1),
+        legend.box.background = element_rect(color = "darkgrey", fill = NA, size = 1),
         legend.justification = c("right", "top"),
-        legend.margin = margin(0, 2, 2, 2))
+        legend.margin = margin(0, 0, 0, 0), legend.spacing.y = unit(0.01, "cm"))
+
+ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 
 estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   .[var.type != "rh"] %>% 
