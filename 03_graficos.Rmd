@@ -272,6 +272,63 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
 ggsave("fig/parametrizaciones.pdf")
 ```
 
+```{r}
+estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[var.type != "rh"] %>% 
+  .[, .(value = mean(value)), 
+    by = .(var.type, verif, estadistico, fisica)] %>%
+  .[estadistico != "rmse"] %>%
+  ggplot(aes(verif, value)) +
+  geom_line(data = ~.x[fisica != "MEAN"],
+            aes(color = fisica,
+                group = interaction(fisica))) +
+    geom_line(data = ~.x[fisica == "MEAN"],
+                       aes(group = interaction(fisica)),  color = "black") +
+  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+  scale_color_brewer(palette = "Set1") +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  labs(title = "Bias - todas las inicializaciones") +
+  facet_wrap( ~ var.type, scales = "free_y",
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+  theme_linedraw(base_size = 14) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"))
+
+ggsave("fig/rmse_parametrizaciones.pdf")
+
+estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[var.type != "rh"] %>% 
+  .[, .(value = mean(value)), 
+    by = .(var.type, verif, estadistico, fisica)] %>%
+  .[estadistico != "bias"] %>%
+  ggplot(aes(verif, value)) +
+  geom_line(data = ~.x[fisica != "MEAN"],
+            aes(color = fisica,
+                group = interaction(fisica))) +
+    geom_line(data = ~.x[fisica == "MEAN"],
+                       aes(group = interaction(fisica)),  color = "black") +
+  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+  scale_color_brewer(palette = "Set1") +
+  # geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  labs(title = "Bias - todas las inicializaciones") +
+  facet_wrap( ~ var.type, scales = "free_y",
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+  theme_linedraw(base_size = 14) +
+  theme(strip.background = element_rect(fill = "white"),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"))
+
+ggsave("fig/bias_parametrizaciones.pdf")
+```
+
+
 ## Espacial
 
 ```{r}
