@@ -133,7 +133,7 @@ all[, var := case_when(obs.id %in% c(2819, 82819) ~ "u",
                           sub.id == 21 ~ "AIRS",
                           sub.id == 22 ~ "ADPAUT",
                           sub.id == 23 ~ "GNSS")]
-                       
+
 
 tabla <- all[, .N, by  = .(var, source)] %>% 
   dcast(source ~ var)
@@ -177,8 +177,8 @@ fisica <- data.table(ens = 1:60,
 estadisticos <- fisica[estadisticos, on = "ens"] 
 
 estadisticos <- estadisticos %>% 
-    .[, .(rmse = mean(rmse),
-           bias = mean(bias)), by = .(verif, fecha.ini, var, fisica)] %>%
+  .[, .(rmse = mean(rmse),
+        bias = mean(bias)), by = .(verif, fecha.ini, var, fisica)] %>%
   .[, ":="(ens = 0,
            fisica = "MEAN")] %>% 
   rbind(estadisticos) %>% 
@@ -187,14 +187,13 @@ estadisticos <- estadisticos %>%
 # mount$finalize()
 
 estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
-                       var %in% c(2820, 82820) ~ "v10m",
-                       var %in% c(3073, 83073) ~ "T2m",
-                       var %in% c(3330, 83330) ~ "q",
-                       var %in% c(3331, 83331) ~ "rh",
-                       var %in% c(4001) ~ "dBz",
-                       var %in% c(14593) ~ "PSFC")]
+                                     var %in% c(2820, 82820) ~ "v10m",
+                                     var %in% c(3073, 83073) ~ "T2m",
+                                     var %in% c(3330, 83330) ~ "q",
+                                     var %in% c(3331, 83331) ~ "rh",
+                                     var %in% c(4001) ~ "dBz",
+                                     var %in% c(14593) ~ "PSFC")]
 ```
-
 
 
 ```{r}
@@ -216,24 +215,32 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
         strip.text = element_text(color = "black"), 
         panel.grid = element_line(color = "grey80"),
         legend.position = c(.98, .15),
-        legend.background = element_rect(color = "darkgrey", fill = NA, size = 0.5),
-        legend.key = element_rect(fill = NA),
+        legend.background = element_rect(color = "darkgrey", fill = "white", size = 0.5),
+        legend.key = element_rect(fill = "white"),
         legend.justification = c("right", "top"),
         legend.margin = margin(0, 0, 0, 0), 
         legend.spacing.y = unit(0.01, "cm"))
 
 ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
+```
 
+
+```{r}
 estadisticos[, hora.ini := hour(fecha.ini)] %>% 
-  .[var.type != "rh"] %>% 
-  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, fisica, estadistico)] %>%
+  tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
+  .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
+  .[var.type != "rh" & micro %in% c("MEAN", "BMJ")] %>% 
+  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), 
+    by = .(var.type, hora.ini, verif, pbl, estadistico)] %>%
   # .[estadistico == "rmse"] %>% 
   ggplot(aes(verif, value)) +
-   geom_line(data = ~.x[fisica != "MEAN"], 
-                       aes(color = fisica, group = interaction(estadistico, fisica))) +
-    geom_line(data = ~.x[fisica == "MEAN"], 
-                       aes(group = interaction(estadistico, fisica)),  color = "black") +
-  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+  geom_line(data = ~.x[pbl == "MEAN"],
+            aes(group = interaction(estadistico, pbl)),  
+            color = "grey20",
+            size = 0.5) +
+  geom_line(data = ~.x[pbl != "MEAN"], 
+            aes(color = pbl, linetype = estadistico,
+                group = interaction(estadistico, pbl))) +
   scale_color_brewer(palette = "Set1") +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_x_continuous("Forecast lead time (hrs)") +
@@ -241,35 +248,66 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
                                               "12" = "12 UTC", "18" = "18 UTC"))) +
+  labs(subtitle = "Microphysics = BMJ") +
   theme_linedraw(base_size = 16) +
   theme(strip.background = element_rect(fill = "white"),
-        strip.text = element_text(color = "black"))
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"))
+
+# estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+#   .[var.type != "rh"] %>% 
+#   .[hora.ini %in% c(0), .(value = mean(value)), 
+#     by = .(var.type, hora.ini, verif, ens, estadistico, fisica)] %>%
+#   # .[estadistico == "rmse"] %>% 
+#   ggplot(aes(verif, value)) +
+#   geom_line(data = ~.x[fisica != "MEAN"], 
+#                        aes(color = fisica, group = interaction(estadistico, ens))) +
+#     geom_line(data = ~.x[fisica == "MEAN"], 
+#                        aes(group = interaction(estadistico, ens)),  color = "black") +
+#   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
+#   scale_color_brewer(palette = "Set1") +
+#   geom_hline(yintercept = 0, color = "darkgray") +
+#   scale_x_continuous("Forecast lead time (hrs)") +
+#   scale_y_continuous(name = NULL, position = "right") +
+#   labs(title = "Init time = 00Z") +
+#   facet_wrap(~var.type, scales = "free_y", switch = "y", 
+#              ncol = 2,
+#              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+#                                               "12" = "12 UTC", "18" = "18 UTC"))) +
+#   theme_linedraw(base_size = 16) +
+#   theme(strip.background = element_rect(fill = "white"),
+#         strip.text = element_text(color = "black"))
 
 estadisticos[, hora.ini := hour(fecha.ini)] %>% 
-  .[var.type != "rh"] %>% 
-  .[hora.ini %in% c(0), .(value = mean(value)), 
-    by = .(var.type, hora.ini, verif, ens, estadistico, fisica)] %>%
+  tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
+  .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
+  .[var.type != "rh" & pbl %in% c("MEAN", "MYNN2")] %>% 
+  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), 
+    by = .(var.type, hora.ini, verif, micro, estadistico)] %>%
   # .[estadistico == "rmse"] %>% 
   ggplot(aes(verif, value)) +
-  geom_line(data = ~.x[fisica != "MEAN"], 
-                       aes(color = fisica, group = interaction(estadistico, ens))) +
-    geom_line(data = ~.x[fisica == "MEAN"], 
-                       aes(group = interaction(estadistico, ens)),  color = "black") +
-  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
-  scale_color_brewer(palette = "Set1") +
+  geom_line(data = ~.x[micro == "MEAN"],
+            aes(group = interaction(estadistico, micro)),  
+            color = "grey20",
+            size = 0.5) +
+  geom_line(data = ~.x[micro != "MEAN"], 
+            aes(color = micro, linetype = estadistico,
+                group = interaction(estadistico, micro))) +
+  scale_color_viridis_d(option = "C") +
+  # scale_color_brewer(palette = "Dark2") +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
-  labs(title = "Init time = 00Z") +
-  facet_wrap(~var.type, scales = "free_y", switch = "y", 
-             ncol = 2,
+  facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
                                               "12" = "12 UTC", "18" = "18 UTC"))) +
+  labs(subtitle = "PBL = MYNN2") +
   theme_linedraw(base_size = 16) +
   theme(strip.background = element_rect(fill = "white"),
-        strip.text = element_text(color = "black"))
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"))
 
-ggsave("fig/parametrizaciones.pdf")
+ggsave("fig/mynn2.pdf", width = 20, height = 15, units = "cm")
 ```
 
 ```{r}
@@ -282,8 +320,8 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   geom_line(data = ~.x[fisica != "MEAN"],
             aes(color = fisica,
                 group = interaction(fisica))) +
-    geom_line(data = ~.x[fisica == "MEAN"],
-                       aes(group = interaction(fisica)),  color = "black") +
+  geom_line(data = ~.x[fisica == "MEAN"],
+            aes(group = interaction(fisica)),  color = "black") +
   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
   scale_color_brewer(palette = "Set1") +
   geom_hline(yintercept = 0, color = "darkgray") +
@@ -291,8 +329,8 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   scale_y_continuous(name = NULL, position = "right") +
   labs(title = "Bias - todas las inicializaciones") +
   facet_wrap( ~ var.type, scales = "free_y",
-             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
-                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                               "12" = "12 UTC", "18" = "18 UTC"))) +
   theme_linedraw(base_size = 14) +
   theme(strip.background = element_rect(fill = "white"),
         strip.text = element_text(color = "black"),
@@ -309,8 +347,8 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   geom_line(data = ~.x[fisica != "MEAN"],
             aes(color = fisica,
                 group = interaction(fisica))) +
-    geom_line(data = ~.x[fisica == "MEAN"],
-                       aes(group = interaction(fisica)),  color = "black") +
+  geom_line(data = ~.x[fisica == "MEAN"],
+            aes(group = interaction(fisica)),  color = "black") +
   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
   scale_color_brewer(palette = "Set1") +
   # geom_hline(yintercept = 0, color = "darkgray") +
@@ -318,8 +356,8 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
   scale_y_continuous(name = NULL, position = "right") +
   labs(title = "Bias - todas las inicializaciones") +
   facet_wrap( ~ var.type, scales = "free_y",
-             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
-                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                               "12" = "12 UTC", "18" = "18 UTC"))) +
   theme_linedraw(base_size = 14) +
   theme(strip.background = element_rect(fill = "white"),
         strip.text = element_text(color = "black"),
@@ -352,12 +390,12 @@ est_espacial <- lapply(files, function(f) {
   rbindlist() 
 
 est_espacial[, var.type := case_when(var %in% c(2819, 82819) ~ "u",
-                       var %in% c(2820, 82820) ~ "v",
-                       var %in% c(3073, 83073) ~ "t",
-                       var %in% c(3330, 83330) ~ "q",
-                       var %in% c(3331, 83331) ~ "rh",
-                       var %in% c(4001) ~ "dBz",
-                       var %in% c(14593) ~ "p")]
+                                     var %in% c(2820, 82820) ~ "v",
+                                     var %in% c(3073, 83073) ~ "t",
+                                     var %in% c(3330, 83330) ~ "q",
+                                     var %in% c(3331, 83331) ~ "rh",
+                                     var %in% c(4001) ~ "dBz",
+                                     var %in% c(14593) ~ "p")]
 
 ```
 
@@ -378,7 +416,7 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   labs(x = "Longitude", y = "Latitude") +
   facet_grid(var.type ~ hora.ini) +
   theme_minimal() 
-    
+
 est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
                  bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
   .[verif == 24 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean < 5 & var.type != "rh"] %>% 
@@ -441,7 +479,7 @@ ggsave("fig/rmse_bias_espacial.pdf", dpi = 300, width = 30, height = 20, units =
 
 ```{r eval=FALSE, include=FALSE}
 estaciones_flojas <- est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
-                 bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
+                                      bias.mean = mean(bias, na.rm = TRUE)), by = .(var.type, hora.ini, verif, lon, lat)] %>% 
   .[verif == 0 & hora.ini %in% c(0, 6, 12, 18) & rmse.mean > 5 & var.type == "t"] %>%
   .[, mean(rmse.mean), by = .(lon, lat)] 
 
@@ -449,7 +487,7 @@ temp_flojas <- all[obs.id == 83073 & lon %in% estaciones_flojas$lon]
 
 temp_flojas[, .N, by = .(lon, lat)] %>% 
   inner_join(estaciones_flojas)
-  
+
 
 temp_flojas[lon == unique(lon)[2]] %>% 
   ggplot(aes(time.obs, obs)) +
