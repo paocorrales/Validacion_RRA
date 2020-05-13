@@ -200,23 +200,29 @@ estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
 
 
 ```{r}
-estadisticos[, hora.ini := hour(fecha.ini)] %>% 
-  .[var.type != "rh" & hora.ini == 06] %>% 
+
+estadisticos_gfs <- estadisticos[, verif := if_else(fuente == "gfs", as.integer(verif - 6), verif)] %>% 
+  .[, fecha.ini := if_else(fuente == "gfs", fecha.ini + hours(6), fecha.ini)]
+
+estadisticos_gfs[, hora.ini := hour(fecha.ini)] %>% 
+  .[!(var.type %in% c("rh", "PSFC")) & verif %between% c(0, 36)] %>% 
   .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico, fuente)] %>%
   ggplot(aes(verif, value)) +
-  geom_line(aes(color = factor(fuente), 
+  geom_line(aes(color = factor(estadistico), 
+                linetype = fuente,
                 group = interaction(estadistico, ens, fuente), 
                 alpha = ens == 0)) +
   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
-  scale_color_discrete() +
-  # scale_color_grey(name = NULL, start = 0, end = 0.5) +
+  scale_linetype_manual(name = NULL, values = c(2, 1)) +
+  # scale_color_discrete() +
+  scale_color_grey(name = NULL, start = 0, end = 0.5) +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
   facet_wrap(~var.type, scales = "free_y") +
-  # facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
-  #            labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
-  #                                             "12" = "12 UTC", "18" = "18 UTC"))) +
+  facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y",
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
   theme_linedraw(base_size = 12) +
   theme(strip.background = element_rect(fill = "white"),
         strip.text = element_text(color = "black"), 
