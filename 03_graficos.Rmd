@@ -296,37 +296,49 @@ ggsave("fig/param_completo.pdf", width = 20, height = 15, units = "cm")
 #   theme_linedraw(base_size = 16) +
 #   theme(strip.background = element_rect(fill = "white"),
 #         strip.text = element_text(color = "black"))
-
-estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[var.type != "rh" & pbl %in% c("MEAN", "MYNN2")] %>% 
-  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), 
-    by = .(var.type, hora.ini, verif, micro, estadistico)] %>%
-  # .[estadistico == "rmse"] %>% 
-  ggplot(aes(verif, value)) +
-  geom_line(data = ~.x[micro == "MEAN"],
-            aes(group = interaction(estadistico, micro)),  
-            color = "grey20",
-            size = 0.5) +
-  geom_line(data = ~.x[micro != "MEAN"], 
-            aes(color = micro, linetype = estadistico,
-                group = interaction(estadistico, micro))) +
-  scale_color_viridis_d(option = "C") +
-  # scale_color_brewer(palette = "Dark2") +
-  geom_hline(yintercept = 0, color = "darkgray") +
+  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m")] %>% 
+  .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)] %>% 
+  .[estadistico == "bias"]
+
+
+gf1 <- gf[micro %in% c("GF")] %>% 
+  .[, col := micro]
+
+gf2 <- gf[pbl %in% c("YSU", "MYJ")] %>% 
+  .[, col := pbl]
+
+gfmean <- gf[pbl == "MEAN"][, col := NULL]
+gfmean <- rbind(GF = gfmean,
+                YSU = gfmean, 
+                MYJ = gfmean, 
+                idcol = "col")
+
+
+ggplot(mapping = aes(verif, value)) +
+  geom_line(data = gf1, aes(color = pbl)) +
+  geom_point(data = gf1[(verif %% 3) == 0], aes(shape = pbl, color = pbl)) +
+  scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
+  scale_shape(name = NULL) +
+  ggnewscale::new_scale_color() +
+  scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
+  geom_line(data = gf2, aes(color = micro, linetype = micro), size = 1.1) +
+  scale_linetype_manual(name = NULL, values = c(2, 3, 6)) +
+  geom_line(data = gfmean,
+            color = "grey20", size = 0.3) +
+  # geom_hline(yintercept = 0, color = "darkgray") +
+  # scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
-  facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y", 
-             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
-                                              "12" = "12 UTC", "18" = "18 UTC"))) +
-  labs(subtitle = "PBL = MYNN2") +
+  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
   theme_linedraw(base_size = 16) +
   theme(strip.background = element_rect(fill = "white"),
         strip.text = element_text(color = "black"),
-        panel.grid = element_line(color = "grey80"))
+        panel.grid = element_line(color = "grey80")) 
 
-ggsave("fig/mynn2.pdf", width = 20, height = 15, units = "cm")
+ggsave("fig/param_bias.pdf", width = 20, height = 13, units = "cm")
 ```
 
 ```{r}
