@@ -236,7 +236,7 @@ ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m")] %>% 
+  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m") & fuente == "rra"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
 
 
@@ -299,9 +299,9 @@ ggsave("fig/param_completo.pdf", width = 20, height = 15, units = "cm")
 gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m")] %>% 
+  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m") & fuente == "rra"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)] %>% 
-  .[estadistico == "bias"]
+  .[estadistico == "rmse"]
 
 
 gf1 <- gf[micro %in% c("GF")] %>% 
@@ -338,7 +338,7 @@ ggplot(mapping = aes(verif, value)) +
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80")) 
 
-ggsave("fig/param_bias.pdf", width = 20, height = 13, units = "cm")
+ggsave("fig/param_rmse.pdf", width = 20, height = 13, units = "cm")
 ```
 
 ```{r}
