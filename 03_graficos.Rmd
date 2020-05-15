@@ -208,14 +208,21 @@ estadisticos_gfs[, hora.ini := hour(fecha.ini)] %>%
   .[!(var.type %in% c("rh", "PSFC")) & verif %between% c(0, 36)] %>% 
   .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico, fuente)] %>%
   ggplot(aes(verif, value)) +
-  geom_line(aes(color = factor(estadistico), 
+  geom_ribbon(data = ~ .x[, .(ymin = min(value),
+                                             ymax = max(value)),
+                          by = .(hora.ini, estadistico, var.type, verif, fuente)],
+              aes(x = verif, ymin = ymin, ymax = ymax, 
+                  fill = fuente,
+                  group = interaction(estadistico, fuente)),
+              inherit.aes = FALSE, alpha = 0.15) +
+  geom_line(data = ~ .x[ens == 0], aes(color = factor(estadistico), 
                 linetype = fuente,
-                group = interaction(estadistico, ens, fuente), 
-                alpha = ens == 0)) +
-  scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
-  scale_linetype_manual(name = NULL, values = c(2, 1)) +
-  # scale_color_discrete() +
-  scale_color_grey(name = NULL, start = 0, end = 0.5) +
+                group = interaction(estadistico, ens, fuente))) +
+  scale_linetype_manual(name = NULL, values = c(2, 1), labels = c("rra" = "RRRA",
+                                                                  "gfs" = "NoRegDA")) +
+  scale_color_grey(name = NULL, start = 0, end = 0.5, labels = c("rmse" = "RMSE",
+                                                                  "bias" = "BIAS")) +
+  scale_fill_brewer(name = NULL, guide = "none", palette = "Set1") +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
@@ -224,7 +231,7 @@ estadisticos_gfs[, hora.ini := hour(fecha.ini)] %>%
              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
                                               "12" = "12 UTC", "18" = "18 UTC"))) +
   theme_linedraw(base_size = 12) +
-  theme(strip.background = element_rect(fill = "white"),
+  theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"), 
         panel.grid = element_line(color = "grey80"),
         # legend.position = c(.98, .15),
@@ -305,9 +312,8 @@ ggsave("fig/param_completo.pdf", width = 20, height = 15, units = "cm")
 gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m") & fuente == "rra"] %>% 
-  .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)] %>% 
-  .[estadistico == "rmse"]
+  .[hora.ini == 12 & var.type %in% c("T2m", "v10m") & fuente == "rra"] %>% 
+  .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)] 
 
 
 gf1 <- gf[micro %in% c("GF")] %>% 
@@ -338,13 +344,14 @@ ggplot(mapping = aes(verif, value)) +
   # scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
-  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
+  ggh4x::facet_nested(estadistico + var.type ~ col, scales = "free_y", switch = "y",
+                      labeller = labeller(estadistico = c("rmse" = "RMSE", "bias" = "BIAS"))) +
   theme_linedraw(base_size = 16) +
-  theme(strip.background = element_rect(fill = "white"),
+  theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80")) 
 
-ggsave("fig/param_rmse.pdf", width = 20, height = 13, units = "cm")
+ggsave("fig/param_rmse_bias.pdf", width = 20, height = 13, units = "cm")
 ```
 
 ```{r}
@@ -503,10 +510,10 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   facet_grid(variable ~ hora.ini, switch = "y", 
              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
                                               "12" = "12 UTC", "18" = "18 UTC"),
-                                 variable = c("bias.mean" = "Bias",
+                                 variable = c("bias.mean" = "BIAS",
                                               "rmse.mean" = "RMSE"))) +
   theme_linedraw(base_size = 12) +
-  theme(strip.background = element_rect(fill = "white"),
+  theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80"))
 
