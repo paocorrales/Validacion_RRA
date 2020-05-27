@@ -87,7 +87,7 @@ all[, .N, by = .(sub.id, hour(time.obs))] %>%
   scale_size_continuous(guide = "none") +
   scale_y_discrete(name = "Type of observation", labels = obs_type) +
   scale_x_continuous(name = "Hour of the day (UTC)", breaks = seq(0, 24, 3)) +
-  theme_linedraw(base_size = 12) +
+  theme_linedraw(base_size = 15) +
   theme(legend.key.height = unit(18, "mm"),
         legend.key.width = unit(2, "mm"), 
         panel.grid = element_line(color = "grey80"),
@@ -273,16 +273,16 @@ ggplot(mapping = aes(verif, value)) +
   scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
   geom_line(data = gf2, aes(color = micro, linetype = estadistico)) +
   geom_line(data = gfmean, aes(linetype = estadistico),
-            color = "grey20", size = 0.5) +
+            color = "grey20", size = 0.3) +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
   facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
-  theme_linedraw(base_size = 16) +
-  theme(strip.background = element_rect(fill = "white"),
+  theme_linedraw(base_size = 14) +
+  theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
-        panel.grid = element_line(color = "grey80"))
+        panel.grid = element_line(color = "grey80")) 
 
 ggsave("fig/param_completo.pdf", width = 20, height = 15, units = "cm")
 
@@ -344,6 +344,8 @@ ggplot(mapping = aes(verif, value)) +
   # scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
+    # ggh4x::facet_nested(estadistico + var.type ~ col, scales = "free_y", switch = "y",
+    #                   labeller = labeller(estadistico = c("rmse" = "RMSE", "bias" = "BIAS"))) +
   ggh4x::facet_nested(estadistico + var.type ~ col, scales = "free_y", switch = "y",
                       labeller = labeller(estadistico = c("rmse" = "RMSE", "bias" = "BIAS"))) +
   theme_linedraw(base_size = 16) +
@@ -486,22 +488,37 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
   na.omit() %>% 
   melt(measure.var = c("rmse.mean", "bias.mean")) %>% 
   ggplot(aes(ConvertLongitude(lon), lat)) +
-  geom_point(data = function(x) x[variable == "rmse.mean"], aes(color = value), size = 2) +
+  geom_point(data = function(x) x[variable == "rmse.mean"], aes(color = value, fill = value), 
+             size = 1, shape = 24) +
   scale_color_viridis_c(name = NULL, guide = guide_colorbar(nbin = 10, 
                                                             raster = FALSE,
                                                             barheight = 10, 
                                                             ticks = FALSE,
                                                             order = 1), 
                         breaks = seq(0, 5, 1), limits = c(NA, 5)) +
+  scale_fill_viridis_c(name = NULL, guide = guide_colorbar(nbin = 10, 
+                                                            raster = FALSE,
+                                                            barheight = 10, 
+                                                            ticks = FALSE,
+                                                            order = 1), 
+                        breaks = seq(0, 5, 1), limits = c(NA, 5)) +
   ggnewscale::new_scale_color() +
-  geom_point(data = function(x) x[variable == "bias.mean"], aes(color = value, shape = factor(sign(value))),
-             size = 2) +
+   ggnewscale::new_scale_fill() +
+  geom_point(data = function(x) x[variable == "bias.mean"], aes(color = value,
+                                                                fill = value,
+                                                                shape = factor(sign(-value))),
+             size = 1) +
   scale_color_divergent(name = NULL,  guide = guide_colorstrip(label.hjust = unit(0.5, "cm"), 
                                                                inside = TRUE,
                                                                barheight = 10, 
                                                                order = 10),
                         breaks = seq(-3, 3, 1)) +  
-  scale_shape_discrete(guide = "none") +
+    scale_fill_divergent(name = NULL,  guide = guide_colorstrip(label.hjust = unit(0.5, "cm"), 
+                                                               inside = TRUE,
+                                                               barheight = 10, 
+                                                               order = 10),
+                        breaks = seq(-3, 3, 1)) + 
+  scale_shape_manual(guide = "none", values = c(24, 25)) +
   # scale_size_area(max_size = 4, guide =  "none") +
   geom_sf(data = map, inherit.aes = FALSE, fill = NA, size = 0.5) +
   coord_sf(ylim = c(-38, -25), xlim = c(-67, -56), label_axes = "-NE-" ) +
@@ -512,7 +529,7 @@ est_espacial[, .(rmse.mean = mean(rmse, na.rm = TRUE),
                                               "12" = "12 UTC", "18" = "18 UTC"),
                                  variable = c("bias.mean" = "BIAS",
                                               "rmse.mean" = "RMSE"))) +
-  theme_linedraw(base_size = 12) +
+  theme_linedraw(base_size = 15) +
   theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80"))
