@@ -249,31 +249,36 @@ ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m", "u10m", "v10m") & fuente == "rra"] %>% 
+  .[hora.ini == 12 & var.type %in% c("T2m", "v10m") & fuente == "rra"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
 
 
-gf1 <- gf[micro %in% c("GF")] %>% 
+gf1 <- gf[micro %in% c("GF", "BMJ", "KF")] %>% 
   .[, col := micro]
 
-gf2 <- gf[pbl %in% c("YSU", "MYJ")] %>% 
+gf2 <- gf[pbl %in% c("YSU", "MYJ", "MYNN2")] %>% 
   .[, col := pbl]
 
 gfmean <- gf[pbl == "MEAN"][, col := NULL]
 gfmean <- rbind(GF = gfmean,
+                BMJ = gfmean,
+                KF = gfmean,
                 YSU = gfmean, 
-                MYJ = gfmean, 
+                MYJ = gfmean,
+                MYNN2 = gfmean,
                 idcol = "col")
-
+gf_bind <- rbind(gf1, gf2)
 
 ggplot(mapping = aes(verif, value)) +
   geom_line(data = gf1, aes(color = pbl, linetype = estadistico)) +
-  scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
+  scale_color_brewer(name = NULL, palette = "Set1") +
+  # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
   ggnewscale::new_scale_color() +
-  scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
+  scale_color_viridis_d(name = NULL, option = "C") +
+  # scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
   geom_line(data = gf2, aes(color = micro, linetype = estadistico)) +
   geom_line(data = gfmean, aes(linetype = estadistico),
-            color = "grey20", size = 0.3) +
+            color = "grey10", size = 0.3) +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
@@ -282,33 +287,74 @@ ggplot(mapping = aes(verif, value)) +
   theme_linedraw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
-        panel.grid = element_line(color = "grey80")) 
+        panel.grid = element_line(color = "grey80"),
+        legend.position = "bottom") 
 
 ggsave("fig/param_completo.pdf", width = 20, height = 15, units = "cm")
 
-# estadisticos[, hora.ini := hour(fecha.ini)] %>% 
-#   .[var.type != "rh"] %>% 
-#   .[hora.ini %in% c(0), .(value = mean(value)), 
-#     by = .(var.type, hora.ini, verif, ens, estadistico, fisica)] %>%
-#   # .[estadistico == "rmse"] %>% 
-#   ggplot(aes(verif, value)) +
-#   geom_line(data = ~.x[fisica != "MEAN"], 
-#                        aes(color = fisica, group = interaction(estadistico, ens))) +
-#     geom_line(data = ~.x[fisica == "MEAN"], 
-#                        aes(group = interaction(estadistico, ens)),  color = "black") +
-#   scale_alpha_discrete(guide = "none", range = c(0.05, 1)) +
-#   scale_color_brewer(palette = "Set1") +
-#   geom_hline(yintercept = 0, color = "darkgray") +
-#   scale_x_continuous("Forecast lead time (hrs)") +
-#   scale_y_continuous(name = NULL, position = "right") +
-#   labs(title = "Init time = 00Z") +
-#   facet_wrap(~var.type, scales = "free_y", switch = "y", 
-#              ncol = 2,
-#              labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
-#                                               "12" = "12 UTC", "18" = "18 UTC"))) +
-#   theme_linedraw(base_size = 16) +
-#   theme(strip.background = element_rect(fill = "white"),
-#         strip.text = element_text(color = "black"))
+
+ggplot(mapping = aes(verif, value)) +
+  geom_line(data = gf1, aes(linetype = pbl, color = estadistico)) +
+  scale_color_brewer(name = NULL, palette = "Set1") +
+  # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
+  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
+  ggnewscale::new_scale("linetype") +
+  # scale_color_viridis_d(name = NULL, option = "C") +
+  # scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
+  geom_line(data = gf2, aes(linetype = micro, color = estadistico)) +
+  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
+  geom_line(data = gfmean, aes(color = estadistico, group = estadistico),
+            color = "grey10", size = 0.3) +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
+  theme_linedraw(base_size = 14) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"),
+        legend.position = "bottom") 
+
+ggsave("fig/param_completo_lines.pdf", width = 20, height = 15, units = "cm")
+
+ggplot(data = gf_bind, aes(verif, value)) +
+  geom_line(aes(linetype = estadistico, color = var.type)) +
+  geom_line(data = copy(gfmean)[, c("micro", "pbl") := NULL], aes(linetype = estadistico, group = interaction(estadistico, var.type)),
+            color = "grey10", size = 0.3) +
+    geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_grid(micro~pbl, switch = "y") +
+  theme_linedraw(base_size = 14) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"),
+        legend.position = "bottom") 
+
+ggplot(mapping = aes(verif, value)) +
+  geom_line(data = gf1, aes(linetype = pbl, color = estadistico)) +
+  scale_color_brewer(name = NULL, palette = "Set1") +
+  # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
+  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
+  ggnewscale::new_scale("linetype") +
+  # scale_color_viridis_d(name = NULL, option = "C") +
+  # scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
+  geom_line(data = gf2, aes(linetype = micro, color = estadistico)) +
+  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
+  geom_line(data = gfmean, aes(color = estadistico, group = estadistico),
+            color = "grey10", size = 0.3) +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
+  theme_linedraw(base_size = 14) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"),
+        legend.position = "bottom") 
+
+
+
 gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
@@ -332,7 +378,8 @@ gfmean <- rbind(GF = gfmean,
 ggplot(mapping = aes(verif, value)) +
   geom_line(data = gf1, aes(color = pbl)) +
   geom_point(data = gf1[(verif %% 3) == 0], aes(shape = pbl, color = pbl)) +
-  scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
+  # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
+  scale_color_brewer(palette = "Set1") +
   scale_shape(name = NULL) +
   ggnewscale::new_scale_color() +
   scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
@@ -340,7 +387,7 @@ ggplot(mapping = aes(verif, value)) +
   scale_linetype_manual(name = NULL, values = c(2, 3, 6)) +
   geom_line(data = gfmean,
             color = "grey20", size = 0.3) +
-  # geom_hline(yintercept = 0, color = "darkgray") +
+  geom_hline(yintercept = 0, color = "darkgray") +
   # scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
