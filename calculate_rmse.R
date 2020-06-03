@@ -4,10 +4,10 @@ library(dplyr)
 library(foreach)
 library(doParallel)
 
-myCluster <- makeCluster(4)
+myCluster <- makeCluster(10)
 registerDoParallel(myCluster)
 
-path <- "/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_83331_2018**"
+path <- "/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_82819_2018**"
 files <- Sys.glob(path)
 
 out <- foreach(f = 1:length(files),
@@ -23,8 +23,10 @@ out <- foreach(f = 1:length(files),
                  temp <- fcst[, `:=`(obs.fcst = obs - fcst,
                                      fecha.ini = fecha_ini,
                                      verif = as.numeric(as.duration(as_datetime(time.obs) - fecha_ini), "hour"))] %>%
-                   .[, .(rmse = sqrt(mean(obs.fcst^2, na.rm = TRUE)), 
-                         bias = mean(obs.fcst, na.rm = TRUE)), by = .(ens, verif, fecha.ini)]
+                   .[, .(cor = cor(obs, fcst, use = "complete.obs")), by = .(ens, verif, fecha.ini)]
+                   # .[, .(rmse = sqrt(mean(obs.fcst^2, na.rm = TRUE)), 
+                   #       bias = mean(obs.fcst, na.rm = TRUE)), by = .(ens, verif, fecha.ini)]
                }
 
-fwrite(out, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/rmse_83331.csv")
+stopCluster(myCluster)
+fwrite(out, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_82819.csv")

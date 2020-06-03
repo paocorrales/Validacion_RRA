@@ -20,7 +20,7 @@ library(interp)
 library(foreach)
 library(doParallel)
 
-myCluster <- makeCluster(10)
+myCluster <- makeCluster(20)
 registerDoParallel(myCluster)
 
 print(args)
@@ -70,7 +70,7 @@ system.time(out <- foreach(f = 1:length(files),
 })
 
 stopCluster(myCluster)
-path_out <- paste0("/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv")
+path_out <- paste0("/home/paola.corrales/datosmunin/RRA_Fcst/interpolados_gfs/fcst_gfs_", var_rra, "_", format(fecha_ini, "%Y%m%d_%H"), ".csv")
 
 print(paste0("Guardo el archivo ", path_out))
 fwrite(out, path_out)
