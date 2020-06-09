@@ -461,6 +461,93 @@ estadisticos[, hora.ini := hour(fecha.ini)] %>%
 ggsave("fig/bias_parametrizaciones.pdf")
 ```
 
+## Correlación
+
+```{r}
+fisica <- data.table(ens = 1:60, 
+                     fisica = rep(c("KF-YSU", 
+                                    "BMJ-YSU",
+                                    "GF-YSU",
+                                    "KF-MYJ",
+                                    "BMJ-MYJ",
+                                    "GF-MYJ",
+                                    "KF-MYNN2",
+                                    "BMJ-MYNN2",
+                                    "GF-MYNN2"), length.out = 60))
+
+files <- Sys.glob("/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor*")
+
+estadisticos <- lapply(files, function(f) {
+  names <- unglue::unglue(f, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_{var}.csv")
+  var <- str_extract(f, "\\d{5}")
+  fread(f) %>% 
+    .[, var := names[[1]][["var"]]] %>%
+    .[, fecha.ini := ymd_hms(fecha.ini)] %>% 
+    .[]
+} ) %>% 
+  rbindlist() 
+
+
+estadisticos <- fisica[estadisticos, on = "ens"] 
+
+estadisticos <- estadisticos %>% 
+  .[, .(cor = mean(cor)), by = .(verif, fecha.ini, var, fisica)] %>%
+  .[, ":="(ens = 0,
+           fisica = "MEAN")] %>% 
+  rbind(estadisticos) %>% 
+  melt(measure.vars = c("cor"), variable.name  = "estadistico")
+
+# mount$finalize()
+
+estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
+                                     var %in% c(2820, 82820) ~ "v10m",
+                                     var %in% c(3073, 83073) ~ "T2m",
+                                     var %in% c(3330, 83330) ~ "q",
+                                     var %in% c(3331, 83331) ~ "rh",
+                                     var %in% c(4001) ~ "dBz",
+                                     var %in% c(14593) ~ "PSFC")]
+
+estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  .[, .(value = mean(value)), by = .(verif, ens, estadistico, var.type, hora.ini)] %>% 
+  .[!(var.type %in% c("rh", "PSFC")) & hora.ini %in% c(0, 6, 12, 18)] %>% 
+  # .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico, fuente)] %>%
+  ggplot(aes(verif, value)) +
+  geom_ribbon(data = ~ .x[, .(ymin = min(value),
+                                             ymax = max(value)),
+                          by = .(hora.ini, estadistico, var.type, verif)],
+              aes(x = verif, ymin = ymin, ymax = ymax, 
+                  group = interaction(estadistico)),
+              inherit.aes = FALSE, alpha = 0.15) +
+  geom_line(data = ~ .x[ens == 0], aes(color = factor(estadistico), 
+                group = interaction(estadistico, ens))) +
+  scale_linetype_manual(name = NULL, values = c(2, 1), labels = c("rra" = "RRRA",
+                                                                  "gfs" = "NoRegDA")) +
+  scale_color_grey(name = NULL, start = 0, end = 0.5, labels = c("rmse" = "RMSE",
+                                                                  "bias" = "BIAS")) +
+  scale_fill_brewer(name = NULL, guide = "none", palette = "Set1") +
+  # geom_hline(yintercept = 0, color = "darkgray") +
+  scale_x_continuous("Forecast lead time (hrs)") +
+  scale_y_continuous(name = NULL, position = "right") +
+  facet_wrap(~var.type, scales = "free_y") +
+  facet_grid(var.type ~ hora.ini, scales = "free_y", switch = "y",
+             labeller = labeller(hora.ini = c("0" = "00 UTC", "6" = "06 UTC",
+                                              "12" = "12 UTC", "18" = "18 UTC"))) +
+  theme_linedraw(base_size = 12) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"), 
+        panel.grid = element_line(color = "grey80"),
+        # legend.position = c(.98, .15),
+        # legend.background = element_rect(color = "darkgrey", fill = "white", size = 0.5),
+        # legend.key = element_rect(fill = "white"),
+        # legend.justification = c("right", "top"),
+        # legend.margin = margin(0, 0, 0, 0), 
+        legend.spacing.y = unit(0.01, "cm"))
+
+ggsave("fig/correlacion.pdf", dpi = 300, width = 22, height = 15, units = "cm")
+
+```
+
+
 
 ## Espacial
 
