@@ -249,24 +249,26 @@ ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m", "v10m") & fuente == "rra"] %>% 
+  .[hora.ini == 12 & var.type %in% c("T2m") & fuente == "rra"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
 
 
 gf1 <- gf[micro %in% c("GF", "BMJ", "KF")] %>% 
-  .[, col := micro]
+  .[, col := factor(micro, levels = c("KF", "BMJ", "GF"))]
 
 gf2 <- gf[pbl %in% c("YSU", "MYJ", "MYNN2")] %>% 
-  .[, col := pbl]
+  .[, col := factor(pbl, levels = c("YSU", "MYJ", "MYNN2"))]
 
 gfmean <- gf[pbl == "MEAN"][, col := NULL]
-gfmean <- rbind(GF = gfmean,
+gfmean <- rbind(KF = gfmean,
                 BMJ = gfmean,
-                KF = gfmean,
+                GF = gfmean,
                 YSU = gfmean, 
                 MYJ = gfmean,
                 MYNN2 = gfmean,
-                idcol = "col")
+                idcol = "col") %>% 
+  .[, col := factor(col, levels = c("KF", "BMJ", "GF", "YSU", "MYJ", "MYNN2"))]
+
 gf_bind <- rbind(gf1, gf2)
 
 ggplot(mapping = aes(verif, value)) +
@@ -274,8 +276,8 @@ ggplot(mapping = aes(verif, value)) +
   scale_color_brewer(name = NULL, palette = "Set1") +
   # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
   ggnewscale::new_scale_color() +
-  scale_color_viridis_d(name = NULL, option = "C") +
-  # scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
+  # scale_color_viridis_d(name = NULL, option = "C") +
+  scale_color_manual(name = NULL, values = c("darkorange","purple","cyan4")) +
   geom_line(data = gf2, aes(color = micro, linetype = estadistico)) +
   geom_line(data = gfmean, aes(linetype = estadistico),
             color = "grey10", size = 0.3) +
@@ -283,14 +285,14 @@ ggplot(mapping = aes(verif, value)) +
   scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
-  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
+  facet_wrap(~ col, ncol = 3) +
   theme_linedraw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80"),
         legend.position = "bottom") 
 
-ggsave("fig/param_completo.pdf", width = 20, height = 15, units = "cm")
+ggsave("fig/param_t2m.pdf", width = 20, height = 15, units = "cm")
 
 
 ggplot(mapping = aes(verif, value)) +
