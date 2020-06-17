@@ -13,6 +13,7 @@ library(lubridate)
 library(dplyr)
 library(stringr)
 library(metR)
+library(patchwork)
 
 map <- rnaturalearth::ne_states(country = c("argentina", "Brazil", "Chile", "Uruguay", "Paraguay", "Bolivia"), returnclass = "sf")
 ```
@@ -246,114 +247,117 @@ ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 
 
 ```{r}
-gf <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+temp <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
   .[hora.ini == 12 & var.type %in% c("T2m") & fuente == "rra"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
 
 
-gf1 <- gf[micro %in% c("GF", "BMJ", "KF")] %>% 
+temp1 <- temp[micro %in% c("GF", "BMJ", "KF")] %>% 
   .[, col := factor(micro, levels = c("KF", "BMJ", "GF"))]
 
-gf2 <- gf[pbl %in% c("YSU", "MYJ", "MYNN2")] %>% 
+temp2 <- temp[pbl %in% c("YSU", "MYJ", "MYNN2")] %>% 
   .[, col := factor(pbl, levels = c("YSU", "MYJ", "MYNN2"))]
 
-gfmean <- gf[pbl == "MEAN"][, col := NULL]
-gfmean <- rbind(KF = gfmean,
-                BMJ = gfmean,
-                GF = gfmean,
-                YSU = gfmean, 
-                MYJ = gfmean,
-                MYNN2 = gfmean,
+tempmean <- temp[pbl == "MEAN"][, col := NULL]
+tempmean <- rbind(KF = tempmean,
+                BMJ = tempmean,
+                GF = tempmean,
+                YSU = tempmean, 
+                MYJ = tempmean,
+                MYNN2 = tempmean,
                 idcol = "col") %>% 
   .[, col := factor(col, levels = c("KF", "BMJ", "GF", "YSU", "MYJ", "MYNN2"))]
 
-gf_bind <- rbind(gf1, gf2)
+vwind <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
+  tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
+  .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
+  .[hora.ini == 12 & var.type %in% c("T2m") & fuente == "rra"] %>% 
+  .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
+
+
+vwind1 <- vwind[micro %in% c("GF", "BMJ", "KF")] %>% 
+  .[, col := factor(micro, levels = c("KF", "BMJ", "GF"))]
+
+vwind2 <- vwind[pbl %in% c("YSU", "MYJ", "MYNN2")] %>% 
+  .[, col := factor(pbl, levels = c("YSU", "MYJ", "MYNN2"))]
+
+vwindmean <- vwind[pbl == "MEAN"][, col := NULL]
+vwindmean <- rbind(KF = vwindmean,
+                BMJ = vwindmean,
+                GF = vwindmean,
+                YSU = vwindmean, 
+                MYJ = vwindmean,
+                MYNN2 = vwindmean,
+                idcol = "col") %>% 
+  .[, col := factor(col, levels = c("KF", "BMJ", "GF", "YSU", "MYJ", "MYNN2"))]
 
 ggplot(mapping = aes(verif, value)) +
-  geom_line(data = gf1, aes(color = pbl, linetype = estadistico)) +
+  geom_line(data = temp1, aes(color = pbl, linetype = estadistico)) +
   scale_color_brewer(name = NULL, palette = "Set1") +
   # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
   ggnewscale::new_scale_color() +
   # scale_color_viridis_d(name = NULL, option = "C") +
   scale_color_manual(name = NULL, values = c("darkorange","purple","cyan4")) +
-  geom_line(data = gf2, aes(color = micro, linetype = estadistico)) +
-  geom_line(data = gfmean, aes(linetype = estadistico),
+  geom_line(data = temp2, aes(color = micro, linetype = estadistico)) +
+  geom_line(data = tempmean, aes(linetype = estadistico),
             color = "grey10", size = 0.3) +
   geom_hline(yintercept = 0, color = "darkgray") +
   scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
-  facet_wrap(~ col, ncol = 3) +
+    facet_wrap(~ col, ncol = 3, labeller = labeller(col = c("KF" = "(a) KF", 
+                                                          "BMJ" = "(b) BMJ", 
+                                                          "GF" = "(c) GF",
+                                                          "YSU" = "(d) YSU", 
+                                                          "MYJ" = "(e) MYJ", 
+                                                          "MYNN2" = "(f) MYNN2"))) +
+  labs(subtitle = "A) T2m") +
   theme_linedraw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80"),
-        legend.position = "bottom") 
-
-ggsave("fig/param_t2m.pdf", width = 20, height = 15, units = "cm")
-
+        legend.position = "bottom") +
 
 ggplot(mapping = aes(verif, value)) +
-  geom_line(data = gf1, aes(linetype = pbl, color = estadistico)) +
+  geom_line(data = vwind1, aes(color = pbl, linetype = estadistico)) +
   scale_color_brewer(name = NULL, palette = "Set1") +
   # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
-  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
-  ggnewscale::new_scale("linetype") +
+  ggnewscale::new_scale_color() +
   # scale_color_viridis_d(name = NULL, option = "C") +
-  # scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
-  geom_line(data = gf2, aes(linetype = micro, color = estadistico)) +
-  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
-  geom_line(data = gfmean, aes(color = estadistico, group = estadistico),
+  scale_color_manual(name = NULL, values = c("darkorange","purple","cyan4")) +
+  geom_line(data = vwind2, aes(color = micro, linetype = estadistico)) +
+  geom_line(data = vwindmean, aes(linetype = estadistico),
             color = "grey10", size = 0.3) +
   geom_hline(yintercept = 0, color = "darkgray") +
+  scale_linetype(name = NULL) +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
-  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
+  facet_wrap(~ col, ncol = 3, labeller = labeller(col = c("KF" = "(a) KF", 
+                                                          "BMJ" = "(b) BMJ", 
+                                                          "GF" = "(c) GF",
+                                                          "YSU" = "(d) YSU", 
+                                                          "MYJ" = "(e) MYJ", 
+                                                          "MYNN2" = "(f) MYNN2"))) +
+  labs(subtitle = "B) v10m") +
   theme_linedraw(base_size = 14) +
   theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80"),
-        legend.position = "bottom") 
-
-ggsave("fig/param_completo_lines.pdf", width = 20, height = 15, units = "cm")
-
-ggplot(data = gf_bind, aes(verif, value)) +
-  geom_line(aes(linetype = estadistico, color = var.type)) +
-  geom_line(data = copy(gfmean)[, c("micro", "pbl") := NULL], aes(linetype = estadistico, group = interaction(estadistico, var.type)),
-            color = "grey10", size = 0.3) +
-    geom_hline(yintercept = 0, color = "darkgray") +
-  scale_x_continuous("Forecast lead time (hrs)") +
-  scale_y_continuous(name = NULL, position = "right") +
-  facet_grid(micro~pbl, switch = "y") +
-  theme_linedraw(base_size = 14) +
+        legend.position = "bottom") +
+  
+  plot_layout(ncol = 1, guides = "collect") & 
   theme(strip.background = element_blank(),
         strip.text = element_text(color = "black"),
         panel.grid = element_line(color = "grey80"),
-        legend.position = "bottom") 
+        legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.box = "horizontal")
 
-ggplot(mapping = aes(verif, value)) +
-  geom_line(data = gf1, aes(linetype = pbl, color = estadistico)) +
-  scale_color_brewer(name = NULL, palette = "Set1") +
-  # scale_color_manual(name = NULL, values = c("#1a9641", "#2b8cbe", "#d7191c")) +
-  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
-  ggnewscale::new_scale("linetype") +
-  # scale_color_viridis_d(name = NULL, option = "C") +
-  # scale_color_manual(name = NULL, values = c("#542788", "#d01c8b", "#e66101")) +
-  geom_line(data = gf2, aes(linetype = micro, color = estadistico)) +
-  scale_linetype_manual(name = NULL, values = c(2, 4 , 1)) +
-  geom_line(data = gfmean, aes(color = estadistico, group = estadistico),
-            color = "grey10", size = 0.3) +
-  geom_hline(yintercept = 0, color = "darkgray") +
-  scale_x_continuous("Forecast lead time (hrs)") +
-  scale_y_continuous(name = NULL, position = "right") +
-  facet_grid(var.type ~ col, scales = "free_y", switch = "y") +
-  theme_linedraw(base_size = 14) +
-  theme(strip.background = element_blank(),
-        strip.text = element_text(color = "black"),
-        panel.grid = element_line(color = "grey80"),
-        legend.position = "bottom") 
+ggsave("fig/parametrizaciones.pdf", width = 20, height = 35, units = "cm")
+
+
 
 
 
@@ -464,24 +468,14 @@ ggsave("fig/bias_parametrizaciones.pdf")
 ## Correlación
 
 ```{r}
-fisica <- data.table(ens = 1:60, 
-                     fisica = rep(c("KF-YSU", 
-                                    "BMJ-YSU",
-                                    "GF-YSU",
-                                    "KF-MYJ",
-                                    "BMJ-MYJ",
-                                    "GF-MYJ",
-                                    "KF-MYNN2",
-                                    "BMJ-MYNN2",
-                                    "GF-MYNN2"), length.out = 60))
-
 files <- Sys.glob("/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor*")
 
 estadisticos <- lapply(files, function(f) {
-  names <- unglue::unglue(f, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_{var}.csv")
+  names <- unglue::unglue(f, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_{fuente}_{var}.csv")
   var <- str_extract(f, "\\d{5}")
   fread(f) %>% 
     .[, var := names[[1]][["var"]]] %>%
+    .[, fuente := names[[1]][["fuente"]]] %>% 
     .[, fecha.ini := ymd_hms(fecha.ini)] %>% 
     .[]
 } ) %>% 
@@ -491,13 +485,11 @@ estadisticos <- lapply(files, function(f) {
 estadisticos <- fisica[estadisticos, on = "ens"] 
 
 estadisticos <- estadisticos %>% 
-  .[, .(cor = mean(cor)), by = .(verif, fecha.ini, var, fisica)] %>%
+  .[, .(cor = mean(cor)), by = .(verif, fecha.ini, var, fisica, fuente)] %>%
   .[, ":="(ens = 0,
            fisica = "MEAN")] %>% 
   rbind(estadisticos) %>% 
   melt(measure.vars = c("cor"), variable.name  = "estadistico")
-
-# mount$finalize()
 
 estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
                                      var %in% c(2820, 82820) ~ "v10m",
@@ -507,25 +499,30 @@ estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
                                      var %in% c(4001) ~ "dBz",
                                      var %in% c(14593) ~ "PSFC")]
 
-estadisticos[, hora.ini := hour(fecha.ini)] %>% 
-  .[, .(value = mean(value)), by = .(verif, ens, estadistico, var.type, hora.ini)] %>% 
-  .[!(var.type %in% c("rh", "PSFC")) & hora.ini %in% c(0, 6, 12, 18)] %>% 
-  # .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico, fuente)] %>%
+
+estadisticos_gfs <- estadisticos[, verif := if_else(fuente == "gfs", as.integer(verif - 6), verif)] %>% 
+  .[, fecha.ini := if_else(fuente == "gfs", fecha.ini + hours(6), fecha.ini)]
+
+estadisticos_gfs[, hora.ini := hour(fecha.ini)] %>% 
+  .[!(var.type %in% c("rh", "PSFC")) & verif %between% c(0, 36)] %>% 
+  .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico, fuente)] %>%
   ggplot(aes(verif, value)) +
   geom_ribbon(data = ~ .x[, .(ymin = min(value),
                                              ymax = max(value)),
-                          by = .(hora.ini, estadistico, var.type, verif)],
+                          by = .(hora.ini, estadistico, var.type, verif, fuente)],
               aes(x = verif, ymin = ymin, ymax = ymax, 
-                  group = interaction(estadistico)),
+                  fill = fuente,
+                  group = interaction(estadistico, fuente)),
               inherit.aes = FALSE, alpha = 0.15) +
   geom_line(data = ~ .x[ens == 0], aes(color = factor(estadistico), 
-                group = interaction(estadistico, ens))) +
+                linetype = fuente,
+                group = interaction(estadistico, ens, fuente))) +
   scale_linetype_manual(name = NULL, values = c(2, 1), labels = c("rra" = "RRRA",
                                                                   "gfs" = "NoRegDA")) +
   scale_color_grey(name = NULL, start = 0, end = 0.5, labels = c("rmse" = "RMSE",
                                                                   "bias" = "BIAS")) +
   scale_fill_brewer(name = NULL, guide = "none", palette = "Set1") +
-  # geom_hline(yintercept = 0, color = "darkgray") +
+  geom_hline(yintercept = 0, color = "darkgray") +
   scale_x_continuous("Forecast lead time (hrs)") +
   scale_y_continuous(name = NULL, position = "right") +
   facet_wrap(~var.type, scales = "free_y") +
