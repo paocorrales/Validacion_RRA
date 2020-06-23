@@ -188,7 +188,34 @@ estadisticos <- estadisticos %>%
   rbind(estadisticos) %>% 
   melt(measure.vars = c("rmse", "bias"), variable.name  = "estadistico")
 
-# mount$finalize()
+# correlacion
+
+files <- Sys.glob("/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor*")
+
+cor <- lapply(files, function(f) {
+  names <- unglue::unglue(f, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_{fuente}_{var}.csv")
+  var <- str_extract(f, "\\d{5}")
+  fread(f) %>% 
+    .[, var := names[[1]][["var"]]] %>%
+    .[, fuente := names[[1]][["fuente"]]] %>% 
+    .[, fecha.ini := ymd_hms(fecha.ini)] %>% 
+    .[]
+} ) %>% 
+  rbindlist() 
+
+
+cor <- fisica[cor, on = "ens"] 
+
+cor <- cor %>% 
+  .[, .(cor = mean(cor)), by = .(verif, fecha.ini, var, fisica, fuente)] %>%
+  .[, ":="(ens = 0,
+           fisica = "MEAN")] %>% 
+  rbind(cor) %>% 
+  melt(measure.vars = c("cor"), variable.name  = "estadistico")
+
+
+estadisticos <- rbind(estadisticos, cor)
+
 
 estadisticos[, var.type := case_when(var %in% c(2819, 82819) ~ "u10m",
                                      var %in% c(2820, 82820) ~ "v10m",
@@ -206,7 +233,7 @@ estadisticos_gfs <- estadisticos[, verif := if_else(fuente == "gfs", as.integer(
   .[, fecha.ini := if_else(fuente == "gfs", fecha.ini + hours(6), fecha.ini)]
 
 estadisticos_gfs[, hora.ini := hour(fecha.ini)] %>% 
-  .[!(var.type %in% c("rh", "PSFC")) & verif %between% c(0, 36)] %>% 
+  .[!(var.type %in% c("rh", "PSFC")) & verif %between% c(0, 36) & estadistico != "cor"] %>% 
   .[hora.ini %in% c(0, 6, 12, 18), .(value = mean(value)), by = .(var.type, hora.ini, verif, ens, estadistico, fuente)] %>%
   ggplot(aes(verif, value)) +
   geom_ribbon(data = ~ .x[, .(ymin = min(value),
@@ -219,7 +246,7 @@ estadisticos_gfs[, hora.ini := hour(fecha.ini)] %>%
   geom_line(data = ~ .x[ens == 0], aes(color = factor(estadistico), 
                 linetype = fuente,
                 group = interaction(estadistico, ens, fuente))) +
-  scale_linetype_manual(name = NULL, values = c(2, 1), labels = c("rra" = "RRRA",
+  scale_linetype_manual(name = NULL, values = c(2, 1), labels = c("rra" = "RRR",
                                                                   "gfs" = "NoRegDA")) +
   scale_color_grey(name = NULL, start = 0, end = 0.5, labels = c("rmse" = "RMSE",
                                                                   "bias" = "BIAS")) +
@@ -250,7 +277,7 @@ ggsave("fig/rmse_bias.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 temp <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m") & fuente == "rra"] %>% 
+  .[hora.ini == 12 & var.type %in% c("T2m") & fuente == "rra" & estadistico != "cor"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
 
 
@@ -273,7 +300,7 @@ tempmean <- rbind(KF = tempmean,
 vwind <- estadisticos[, hora.ini := hour(fecha.ini)] %>% 
   tidyr::separate(fisica, into = c("micro", "pbl")) %>% 
   .[, pbl := if_else(is.na(pbl), "MEAN", pbl)] %>% 
-  .[hora.ini == 12 & var.type %in% c("T2m") & fuente == "rra"] %>% 
+  .[hora.ini == 12 & var.type %in% c("v10m") & fuente == "rra" & estadistico != "cor"] %>% 
   .[, .(value = mean(value)), by = .(var.type, hora.ini, verif, micro, pbl, estadistico)]
 
 
