@@ -1,0 +1,283 @@
+---
+title: "05_sondeos.Rmd"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(data.table)
+library(metR)
+library(lubridate)
+
+rra_proj = "+proj=lcc +lat_1=-34.0 +lat_2=-34.0 +lat_0=-34.0 +lon_0=-60.0 +a=6370000 +b=6370000"
+
+read_radiosonde_relampago <- function(file){
+  # Leo línea por línea
+  lines <- readLines(file)
+  
+  # Indices donde comienza cada sondeo
+  idx <- which(grepl("Data Type:", lines))
+  idx <- c(idx, length(lines)+1)
+  soundings <- list()
+  for (i in seq_len(length(idx)-1)) { 
+    
+    out <- read.table(text = lines[(idx[i] + 15):(idx[i + 1] - 1)]) %>% 
+      as.data.table()
+    
+    names <- strsplit(lines[idx[i] + 12], " ")[[1]]
+    names <- names[names != ""]
+    colnames(out) <- names
+    
+    launch <- lubridate::ymd_hms(strsplit(lines[idx[i] + 4], "    ")[[1]][2])
+    nominal_launch <- lubridate::ymd_hms(strsplit(lines[idx[i] + 11], "):")[[1]][2])
+    site <- strsplit(lines[idx[i] + 2], "         ")[[1]][2]  
+    
+    out <- out[, ":="(Site = site,
+                      Nominal_launch_time = nominal_launch,
+                      Launch_time = launch)] %>% 
+      .[, Time := seconds(Time) + Launch_time] %>% 
+      .[, lapply(.SD, function(x) replace(x, as.character(x) %in% c("999", "9999", "999.0"), NA))] %>% 
+      .[]
+    if (length(colnames(out) == 24)) {
+      colnames(out) <- c("time", "p", "t", "td", "rh", "u", "v", "spd", "dir", "w", "lon", "lat", "ele", 
+                         "azi", "alt", "qp", "qt", "qrh", "qu", "qv", "qdZ", "site", "nominal_launch_time", 
+                         "launch_time")
+    } else {
+      colnames(out) <- c("time", "p", "t", "td", "rh", "u", "v", "spd", "dir", "w", "lon", "lat", "ele", 
+                         "azi", "alt", "qp", "qt", "qrh", "qu", "qv", "qdZ", "site", "nominal_launch_time", 
+                         "launch_time", "mixr", "ptmp")
+    }
+    if (site == "Sao Borja, Brazil") {
+      out <- out[, ":="(lon = data.table::nafill(lon, "locf"),
+                        lat = data.table::nafill(lat, "locf"))]
+    }
+    
+    soundings[[i]] <- out
+  }
+  soundings <- rbindlist(soundings, fill=TRUE)
+}
+
+DewPoint2 <- function (p, ws, td, epsilon = 0.622) 
+{
+  if (hasArg(p) & hasArg(ws) & !hasArg(td)) {
+    if (is.na(ws)) {
+      return(ws)
+    }
+    .dew <- function(td) {
+      es <- ClausiusClapeyron(td)
+      ws - epsilon * es/(p - es)
+    }
+    t <- seq(10, 273 + 100, length.out = 100)
+    samples <- .dew(t)
+    i <- which(samples < 0)[1]
+    tm <- t[i]
+    
+    td <- try(uniroot(.dew, c(10, tm))$root, silent = TRUE)
+    if (inherits(td, "try-error"))  {
+      browser()    
+      
+      return(NA_real_)
+    }
+    return(td)
+  }
+  else if (hasArg(p) & !hasArg(ws) & hasArg(td)) {
+    es <- ClausiusClapeyron(td)
+    return(epsilon * es/(p - es))
+  }
+  else if (!hasArg(p) & hasArg(ws) & hasArg(td)) {
+    es <- ClausiusClapeyron(td)
+    return(es * (1 + epsilon/ws))
+  }
+  else if (hasArg(p) & hasArg(ws) & hasArg(td)) {
+    stop("Too many state variables.")
+  }
+  else {
+    stop("Too few stat variables.")
+  }
+}
+
+
+td <- function(lev, q) {
+  # browser()
+  lev <- lev*100
+  q <- q/1000
+  
+  td <- if_else(is.na(q) | q < 1e-10, NA_real_, map2_dbl(lev, q, ~ DewPoint2(.x, .y)))
+}
+```
+
+
+```{r eval=FALSE}
+files <- list.files(path = "/home/paola.corrales/datosmunin3/DATA/RELAMPAGO/sondeos_raw",
+                    pattern = "cls", full.names = TRUE)
+
+sondeos <- purrr::map(files, ~ read_radiosonde_relampago(.x)) %>%
+  rbindlist() %>% 
+  .[site == "M1: Cordoba, Argentina"]
+
+path_npp <- "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw"
+path_out <- "/home/paola.corrales/datosmunin3/RRA_Validacion/interp_sondeos_fcst/"
+
+first_date <- ymd_hms("20181109000000")
+
+dates <- seq(first_date, by = "6 hour",
+             length.out = 2) #163
+
+
+for (d in seq_along(dates)) {
+  
+  ini_date <- dates[d]
+  
+  print(ini_date)
+  
+  lead_time <- c(0:36)
+  
+  dir <- paste0(path_npp, "/", format(ini_date, "%Y%m%d_%H"), "F")
+  
+  if (!dir.exists(dir)) {
+    next
+  }
+  
+  file_wrf <- paste0(path_npp, "/", 
+                     format(ini_date, "%Y%m%d_%H"), "F/NPP_",
+                     format(ini_date, "%Y"), "-",
+                     format(ini_date, "%m"), "-",
+                     format(ini_date, "%d"), "_",
+                     format(ini_date, "%H"), "_FC",
+                     formatC(lead_time, width = 2, flag = "0"),
+                     ".nc")
+  
+  out <- purrr::map_df(file_wrf, function(f) {  
+    
+    if (!file.exists(f)) {
+      return(NULL)
+    }
+    # print(basename(f))
+    meta <- unglue::unglue(f, "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw/{fecha_ini}F/NPP_{fecha_ini2}_FC{fcst_hour}.nc")
+    
+    fcst <- ReadNetCDF(f,
+                       vars = c(gp = "yacanto/Z", t = "yacanto/T", u = "yacanto/U", v = "yacanto/V", q = "yacanto/Q")) %>%
+      # na.omit() %>%
+      .[, ":="(td = td(`yacanto/lev`, q) - 273.15,
+               t = t - 273.15,
+               fecha_ini = ymd_h(meta[[1]][["fecha_ini"]]),
+               fecha = ymd_h(meta[[1]][["fecha_ini"]]) + hours(meta[[1]][["fcst_hour"]]))] %>%
+      setnames(c("yacanto/ens", "yacanto/lev"), c("ens", "lev"))
+    
+    levs <- fcst[ens == 1, lev]
+    
+    fcst_time <- ymd_h(meta[[1]][["fecha_ini"]]) + hours(meta[[1]][["fcst_hour"]])
+    intervalo <- interval(fcst_time - minutes(30), fcst_time + minutes(30))
+    
+    subset <- sondeos[launch_time %within% intervalo] 
+    
+    # message(paste0(nrow(subset), " observaciones de sondeos en este tiempo"))
+    
+    if (nrow(subset) > 1) {
+      subset <- subset %>% 
+        melt(measure.vars = c("t", "td", "u", "v"), value.name = "obs_value") %>% 
+        .[, c("p", "site", "launch_time", "variable", "obs_value")] %>% 
+        .[, .(obs_value = mean(obs_value, na.rm = TRUE)), by = .(site, launch_time, variable, p)] %>% 
+        
+        .[, .(obs_value = approx(p, obs_value, xout = levs)$y,
+              lev = levs), 
+          by = .(variable)] 
+      
+      fcst <- fcst %>% 
+        melt(measure.vars = c("t", "td", "u", "v"), value.name = "fcst_value") %>% 
+        .[, c("ens", "lev", "fecha_ini", "fecha", "variable", "fcst_value")] %>% 
+        subset[., on = c("variable", "lev")]
+      
+    } 
+    
+  })
+  write_csv(out, paste0(path_out, "sondeo_", format(ini_date, "%Y%m%d_%H"), "F.csv"))
+  print("Done!")
+}
+
+
+
+```
+
+```{r}
+interp_files <- Sys.glob(paste0(path_out, "*"))
+
+sondeos_interp <- map_df(interp_files,  ~ fread(.x)) %>% 
+  setDT() %>% 
+  .[, fcst_hour := as.numeric((fecha - fecha_ini)/3600)] %>% 
+  .[]
+
+fisica <- data.table(ens = 1:60,
+                     fisica = rep(c("KF-YSU", 
+                                    "BMJ-YSU",
+                                    "GF-YSU",
+                                    "KF-MYJ",
+                                    "BMJ-MYJ",
+                                    "GF-MYJ",
+                                    "KF-MYNN2",
+                                    "BMJ-MYNN2",
+                                    "GF-MYNN2"), length.out = 60)) %>% 
+  separate(fisica, into = c("cumulus", "pbl"), remove = FALSE) %>% 
+  setDT()
+
+
+init <- c(0, 12, 18)
+for (i in init) { 
+  
+  sondeos_interp[hour(fecha) == i & fcst_hour %in% seq(0, 24, 6)] %>% 
+    .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+          bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, fcst_hour)] %>% 
+    melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico") %>% 
+    ggplot(aes(lev, value)) +
+    geom_point(aes(color = factor(fcst_hour)), size = 0.3) +
+    geom_line(aes(color = factor(fcst_hour), linetype = estadistico), size = 0.3) +
+    coord_flip() +
+    scale_x_level() +
+    facet_wrap(~variable, scales = "free_x") +
+    labs(color = "Forecast\nlead time", linetype = NULL, x = NULL,
+         subtitle = paste0("M1: Cordoba - ", i, " UTC")) +
+    theme_minimal()
+  
+  ggsave(paste0("sondeo_", i, "UTC.png"), height = 7, width = 7)
+  
+  
+  sondeos_interp[hour(fecha) == i & fcst_hour %in% seq(0, 24, 6)] %>% 
+    fisica[., on = .NATURAL] %>% 
+    .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+          bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, fcst_hour, cumulus)] %>% 
+    melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico") %>% 
+    ggplot(aes(lev, value)) +
+    geom_point(aes(color = factor(fcst_hour)), size = 0.1) +
+    geom_line(aes(color = factor(fcst_hour), linetype = estadistico), size = 0.3) +
+    coord_flip() +
+    scale_x_level() +
+    facet_grid(cumulus~variable, scales = "free_x") +
+    labs(color = "Forecast\nlead time", linetype = NULL, x = NULL,
+         subtitle = paste0("M1: Cordoba - ", i, " UTC")) +
+    theme_minimal()
+  
+  ggsave(paste0("sondeo_cumulus_", i, "UTC.png"), height = 7, width = 8)
+  
+  sondeos_interp[hour(fecha) == i & fcst_hour %in% seq(0, 24, 6)] %>% 
+    fisica[., on = .NATURAL] %>% 
+    .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+          bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, fcst_hour, pbl)] %>% 
+    melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico") %>% 
+    ggplot(aes(lev, value)) +
+    geom_point(aes(color = factor(fcst_hour)), size = 0.1) +
+    geom_line(aes(color = factor(fcst_hour), linetype = estadistico), size = 0.3) +
+    coord_flip() +
+    scale_x_level() +
+    facet_grid(pbl~variable, scales = "free_x") +
+    labs(color = "Forecast\nlead time", linetype = NULL, x = NULL,
+         subtitle = paste0("M1: Cordoba - ", i, " UTC")) +
+    theme_minimal()
+  
+  ggsave(paste0("sondeo_pbl_", i, "UTC.png"), height = 7, width = 8)
+  
+}
+
+```
+
