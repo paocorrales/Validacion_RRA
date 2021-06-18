@@ -116,11 +116,13 @@ print("Listo los sondeos, no podrían ser más!")
 path_npp <- "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw"
 path_out <- "/home/paola.corrales/datosmunin3/RRA_Validacion/interp_sondeos_fcst/"
 
-first_date <- ymd_hms("20181109000000")
+# first_date <- ymd_hms("20181109000000")
+first_date <- ymd_hms("20181109090000")
 
-dates <- seq(first_date, by = "6 hour",
-             length.out = 163) #163
-
+# dates <- seq(first_date, by = "6 hour",
+#              length.out = 163) #163
+dates <- seq(first_date, by = "24 hour",
+             length.out = 41) #163
 
 for (d in seq_along(dates)) {
   

@@ -224,6 +224,7 @@ fisica <- data.table(ens = 1:60,
 
 
 init <- c(0, 12, 18)
+
 for (i in init) { 
   
   sondeos_interp[hour(fecha) == i & fcst_hour %in% seq(0, 24, 6)] %>% 
@@ -280,4 +281,105 @@ for (i in init) {
 }
 
 ```
+
+```{r}
+fecha_ini_fcst <- 12
+
+ini_12 <- sondeos_interp[hour(fecha_ini) == 12 & fcst_hour %in% c(0, 6, 12, 24)] %>% 
+  .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+        bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, fcst_hour)] %>% 
+  .[, radiosonde := fcase(fcst_hour == 0, "12 UTC",
+                          fcst_hour == 6, "18 UTC",
+                          fcst_hour == 12, "00 UTC",
+                          fcst_hour == 24, "12 UTC next day")] %>% 
+  .[, hora_ini := 12] %>% 
+  melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico")
+
+
+ini_9 <- sondeos_interp[hour(fecha_ini) == 9 & fcst_hour %in% c(3, 9, 15, 27)] %>% 
+  .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+        bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, fcst_hour)] %>% 
+  .[, radiosonde := fcase(fcst_hour == 3, "12 UTC",
+                          fcst_hour == 9, "18 UTC",
+                          fcst_hour == 15, "00 UTC",
+                          fcst_hour == 27, "12 UTC next day")] %>% 
+  .[, hora_ini := 9] %>% 
+  melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico")
+
+rbind(ini_9, ini_12) %>%  
+  ggplot(aes(lev, value)) +
+  geom_hline(aes(yintercept = 0), color = "grey 40") +
+  # geom_point(aes(color = factor(hora_ini)), size = 0.3) +
+  geom_line(aes(color = factor(hora_ini), linetype = estadistico), size = 0.3) +
+  # scale_color_discrete(labels = c("0" = "12 UTC", "6" = "18 UTC", "12" = "00 UTC", "24" = "12 UTC next day")) +
+  coord_flip() +
+  scale_x_level() +
+  facet_grid(radiosonde~variable, scales = "free_x") +
+  labs(color = "Forecast initialization", linetype = NULL, x = NULL, y = NULL) +
+  theme_minimal()
+
+ggsave(paste0("sondeos_init_9_12_UTC.png"), height = 7, width = 9)
+```
+
+
+```{r}
+rbind(ini_9, ini_12) %>%  
+  .[, estadistico := paste0(toupper(estadistico), hora_ini)] %>% 
+  dcast(variable + lev + radiosonde ~ estadistico, value.var = "value") %>%
+  .[, ":="(RMSE12_RMSE9 = RMSE12 - RMSE9,
+           BIAS12_BIAS9 = BIAS12 - BIAS9)] %>%
+  .[] %>% 
+  ggplot(aes(lev, RMSE12_RMSE9)) +
+  geom_hline(aes(yintercept = 0), color = "grey 40") +
+  geom_line(aes(color = radiosonde), size = 0.4) +
+  coord_flip() +
+  scale_x_level() +
+  facet_grid(.~variable, scales = "free_x") +
+  labs(color = "Radiosonde\nlaunch time", linetype = NULL, x = NULL, y = NULL,
+       subtitle = "RMSE12 - RMSE09") +
+  theme_minimal()
+
+ggsave("RMSE12_RMSE9.png", height = 4, width = 7)
+
+rbind(ini_9, ini_12) %>%  
+  .[, estadistico := paste0(toupper(estadistico), hora_ini)] %>% 
+  dcast(variable + lev + radiosonde ~ estadistico, value.var = "value") %>%
+  .[, ":="(RMSE12_RMSE9 = RMSE12 - RMSE9,
+           BIAS12_BIAS9 = BIAS12 - BIAS9)] %>%
+  .[] %>% 
+  ggplot(aes(lev, BIAS12_BIAS9)) +
+  geom_hline(aes(yintercept = 0), color = "grey 40") +
+  geom_line(aes(color = radiosonde), size = 0.7) +
+  coord_flip() +
+  scale_x_level() +
+  facet_grid(.~variable, scales = "free_x") +
+  labs(color = "Radiosonde\nlaunch time", linetype = NULL, x = NULL, y = NULL,
+       subtitle = "BIAS12 - BIAS09") +
+  theme_minimal()
+```
+
+
+```{r}
+
+# fecha_ini == as_datetime("2018-11-10 00:00:00 UTC") 
+sondeos_interp[ens == 1 & hour(fecha) %in% c(0, 12, 18) & fcst_hour %in% c(0, 6, 12) & variable == "t" & lev > 500] %>% 
+  # melt(measure.vars = c("obs_value", "fcst_value"), variable.name = "run") %>% 
+  .[, fecha_ini := factor(fecha)] %>% 
+  # .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+  #       bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, fcst_hour)] %>% 
+  #  melt(measure.vars = c("rmse", "bias"), variable.name = "run") %>% 
+  ggplot(aes(fcst_value, obs_value)) +
+  # geom_line(aes(linetype = run)) +
+  
+  geom_point(aes(color = factor(lev))) +
+  geom_abline(intercept = 0, slope = 1) +
+  scale_color_viridis_d() +
+  # coord_flip() +
+  # scale_x_level() +
+  facet_grid(fcst_hour~hour(fecha), scales = "free_x")
+```
+
+
+
+
 
