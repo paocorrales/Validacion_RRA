@@ -7,7 +7,7 @@ library(doParallel)
 myCluster <- makeCluster(10)
 registerDoParallel(myCluster)
 
-path <- "/home/paola.corrales/datosmunin/RRA_Fcst/interpolados/fcst_82819_2018**"
+path <- "/home/paola.corrales/datosmunin/RRA_Fcst/interpolados_gfs/fcst_gfs_14593_2018**"
 files <- Sys.glob(path)
 
 out <- foreach(f = 1:length(files),
@@ -29,4 +29,4 @@ out <- foreach(f = 1:length(files),
                }
 
 stopCluster(myCluster)
-fwrite(out, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_82819.csv")
+fwrite(out, "/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/cor_gfs_14593.csv")

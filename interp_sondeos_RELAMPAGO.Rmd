@@ -117,7 +117,7 @@ sondeos <- purrr::map(files, ~ read_radiosonde_relampago(.x)) %>%
   rbindlist() %>% 
   .[site == "M1: Cordoba, Argentina"]
 
-path_npp <- "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw"
+path_npp <- "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/gfs_raw"
 path_out <- "/home/paola.corrales/datosmunin3/RRA_Validacion/interp_sondeos_fcst/"
 
 first_date <- ymd_hms("20181109000000")
@@ -155,7 +155,7 @@ for (d in seq_along(dates)) {
       return(NULL)
     }
     # print(basename(f))
-    meta <- unglue::unglue(f, "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw/{fecha_ini}F/NPP_{fecha_ini2}_FC{fcst_hour}.nc")
+    meta <- unglue::unglue(f, "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/gfs_raw/{fecha_ini}F/NPP_{fecha_ini2}_FC{fcst_hour}.nc")
     
     fcst <- ReadNetCDF(f,
                        vars = c(gp = "yacanto/Z", t = "yacanto/T", u = "yacanto/U", v = "yacanto/V", q = "yacanto/Q")) %>%
@@ -193,7 +193,7 @@ for (d in seq_along(dates)) {
     } 
     
   })
-  write_csv(out, paste0(path_out, "sondeo_", format(ini_date, "%Y%m%d_%H"), "F.csv"))
+  write_csv(out, paste0(path_out, "sondeo_gfs_", format(ini_date, "%Y%m%d_%H"), "F.csv"))
   print("Done!")
 }
 
@@ -202,11 +202,22 @@ for (d in seq_along(dates)) {
 ```
 
 ```{r}
-interp_files <- Sys.glob(paste0(path_out, "*"))
+interp_files <- Sys.glob(paste0(path_out, "*sondeo_2*"))
 
 sondeos_interp <- map_df(interp_files,  ~ fread(.x)) %>% 
   setDT() %>% 
   .[, fcst_hour := as.numeric((fecha - fecha_ini)/3600)] %>% 
+  .[, run := "RRR"] %>% 
+  .[, variable := fct_relevel(variable, "u", "v", "t", "td")] %>% 
+  .[]
+
+interp_files <- Sys.glob(paste0(path_out, "*gfs*"))
+
+sondeos_interp_gfs <- map_df(interp_files,  ~ fread(.x)) %>% 
+  setDT() %>% 
+  .[, fcst_hour := as.numeric((fecha - fecha_ini))] %>% 
+  .[, run := "NoRegDA"] %>% 
+  .[, variable := fct_relevel(variable, "u", "v", "t", "td")] %>% 
   .[]
 
 fisica <- data.table(ens = 1:60,
@@ -221,7 +232,59 @@ fisica <- data.table(ens = 1:60,
                                     "GF-MYNN2"), length.out = 60)) %>% 
   separate(fisica, into = c("cumulus", "pbl"), remove = FALSE) %>% 
   setDT()
+init <- c()
 
+
+max_min <- rbind(sondeos_interp[(hour(fecha) == 12 & fcst_hour == 0) | (hour(fecha) == 18 & fcst_hour == 6)],
+                 sondeos_interp_gfs[(hour(fecha) == 12 & fcst_hour == 6) | (hour(fecha) == 18 & fcst_hour == 12)]) %>% 
+  .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+        bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(ens, variable, lev, sondeo = hour(fecha), fcst_hour, run)] %>% 
+  .[sondeo == 12] %>% 
+  melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico") %>% 
+  .[, ":="(max_v = max(value, na.rm = TRUE),
+           min_v = min(value, na.rm =TRUE)), by = .(variable, lev, sondeo, fcst_hour, run, estadistico)] %>% 
+  .[is.finite(max_v)]
+
+rbind(sondeos_interp[(hour(fecha) == 12 & fcst_hour == 0) | (hour(fecha) == 18 & fcst_hour == 6)],
+      sondeos_interp_gfs[(hour(fecha) == 12 & fcst_hour == 6) | (hour(fecha) == 18 & fcst_hour == 12)]) %>% 
+  .[, .(rmse = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE)),
+        bias = mean(fcst_value - obs_value, na.rm = TRUE)), by = .(variable, lev, sondeo = hour(fecha), fcst_hour, run)] %>% 
+  .[sondeo == 12] %>% 
+  melt(measure.vars = c("rmse", "bias"), variable.name = "estadistico") %>% 
+  # .[, variable := fct_relevel(variable, "u", "v", "t", "td")] %>% 
+  ggplot(aes(lev, value)) +
+  geom_hline(yintercept = 0, color = "grey90") +
+  geom_ribbon(data = max_min, aes(ymin = min_v, ymax = max_v, fill = run, 
+                                  group = interaction(run, estadistico, sondeo, fcst_hour)),
+              alpha = 0.15) +
+  geom_line(aes(color = estadistico, 
+                linetype = run, 
+                group = interaction(run, estadistico, sondeo, fcst_hour)), size = 0.5) +
+  scale_linetype_manual(values = c(2, 1)) +
+  scale_color_manual(values = c("black", "grey40")) +
+  scale_fill_brewer(guide = NULL, palette = "Set1") +
+  coord_flip() +
+  scale_x_level(breaks = seq(100, 1000, 100)) +
+  facet_wrap(~variable, scales = "free_x",
+             labeller = labeller(variable = c("t" = "(c) BIAS & RMSE T [K]",
+                                              "td" = "(d) BIAS & RMSE Td [K]",
+                                              "u" = "(a) BIAS & RMSE U [ms-1]",
+                                              "v" = "(b) BIAS & RMSE V [ms-1]"))) +
+  labs(color = NULL, linetype = NULL, x = NULL, y = NULL) +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"),
+        panel.grid.major = element_line(color = "grey97"),
+        panel.grid.minor = element_line(color = "grey97"),
+        legend.position = c(0.90, 0.34),
+        legend.box.background = element_rect(fill = NULL,
+                                         size = 0.5, linetype = "solid", 
+                                         colour = "grey90"),
+        # legend.margin = margin(0, 8, 7, 8),
+        legend.spacing.y = unit(-0.1, "cm"))
+
+ggsave("opcion1.png", height = 7, width = 7)
 
 init <- c(0, 12, 18)
 
@@ -241,7 +304,7 @@ for (i in init) {
          subtitle = paste0("M1: Cordoba - ", i, " UTC")) +
     theme_minimal()
   
-  ggsave(paste0("sondeo_", i, "UTC.png"), height = 7, width = 7)
+  ggsave(paste0("sondeo_gfs_", i, "UTC.png"), height = 7, width = 7)
   
   
   sondeos_interp[hour(fecha) == i & fcst_hour %in% seq(0, 24, 6)] %>% 
@@ -276,11 +339,94 @@ for (i in init) {
          subtitle = paste0("M1: Cordoba - ", i, " UTC")) +
     theme_minimal()
   
-  ggsave(paste0("sondeo_pbl_", i, "UTC.png"), height = 7, width = 8)
+  ggsave(paste0("sondeo_pbl__gfs", i, "UTC.png"), height = 7, width = 8)
   
 }
 
 ```
+
+```{r}
+rmse_12 <- sondeos_interp[hour(fecha_ini) == 12 & fcst_hour %in% c(0, 6, 9, 3, 12)] %>% 
+  .[, .(rmse_12 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_9 <- sondeos_interp[hour(fecha_ini) == 9 & fcst_hour %in% c(3, 9, 12, 6, 15)] %>% 
+  .[, .(rmse_9 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_18 <- sondeos_interp[hour(fecha_ini) == 18 & fcst_hour %in% c(0, 3, 6, 18, 21)] %>% 
+  .[, .(rmse_18 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_15 <- sondeos_interp[hour(fecha_ini) == 15 & fcst_hour %in% c(3, 6, 9, 21, 24)] %>% 
+  .[, .(rmse_15 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_0 <- sondeos_interp[hour(fecha_ini) == 0 & fcst_hour %in% c(0, 12, 15, 18, 21)] %>% 
+  .[, .(rmse_0 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_21 <- sondeos_interp[hour(fecha_ini) == 21 & fcst_hour %in% c(3, 15, 18, 21, 24)] %>% 
+  .[, .(rmse_21 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_6 <- sondeos_interp[hour(fecha_ini) == 6 & fcst_hour %in% c(6, 9, 12, 15, 18)] %>% 
+  .[, .(rmse_6 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+rmse_3 <- sondeos_interp[hour(fecha_ini) == 3 & fcst_hour %in% c(9, 12, 15, 18, 21)] %>% 
+  .[, .(rmse_3 = sqrt(mean((fcst_value - obs_value)^2, na.rm = TRUE))), by = .(variable, lev)] 
+
+
+
+
+rbind(rmse_12[rmse_9, on = .NATURAL] %>% 
+        .[, ":="(diff = rmse_12 - rmse_9,
+                 time = "12-09 UTC")] %>% 
+        .[, ":="(rmse_12 = NULL,
+                 rmse_9 = NULL)],
+      
+      rmse_18[rmse_15, on = .NATURAL] %>% 
+        .[, ":="(diff = rmse_18 - rmse_15,
+                 time = "18-15 UTC")] %>% 
+        .[, ":="(rmse_18 = NULL,
+                 rmse_15 = NULL)],
+      
+      rmse_0[rmse_21, on = .NATURAL] %>% 
+        .[, ":="(diff = rmse_0 - rmse_21,
+                 time = "00-21 UTC")] %>% 
+        .[, ":="(rmse_0 = NULL,
+                 rmse_21 = NULL)],
+      
+      rmse_6[rmse_3, on = .NATURAL] %>% 
+        .[, ":="(diff = rmse_6 - rmse_3,
+                 time = "06-03 UTC")] %>% 
+        .[, ":="(rmse_6 = NULL,
+                 rmse_3 = NULL)]) %>% 
+  .[, variable := fct_relevel(variable, "u", "v", "t", "td")] %>% 
+  ggplot(aes(lev, diff)) +
+  geom_hline(yintercept = 0, color = "grey90") +
+  geom_line(aes(color = time)) +
+  geom_point(aes(shape = time, color = time), size = 1) +
+  coord_flip() +
+  scale_color_manual(values = c("#000000", "#A9A9A9", "#C0C0C0", "#696969")) +
+  scale_shape_manual(values = c(16, 15, 17, 18)) +
+  scale_x_level(breaks = seq(100, 1000, 100)) +
+  facet_wrap(~variable, scales = "free_x", labeller = labeller(variable = c("t" = "(c) RMSE diff T [K]",
+                                                                            "td" = "(d) RMSE diff Td [K]",
+                                                                            "u" = "(a) RMSE diff U [ms-1]",
+                                                                            "v" = "(b) RMSE diff V [ms-1]"))) +
+  labs(color = NULL, shape = NULL, y = NULL) +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"),
+        panel.grid = element_line(color = "grey80"),
+        panel.grid.major = element_line(color = "grey97"),
+        panel.grid.minor = element_line(color = "grey97"),
+        legend.position = c(0.9, 0.35),
+        legend.background = element_rect(fill = NULL,
+                                         size = 0.5, linetype = "solid", 
+                                         colour = "grey90"),
+        legend.margin = margin(0, 8, 7, 8))
+
+ggsave("diff_rmse_variables.png", height = 7, width = 7)
+
+
+```
+
 
 ```{r}
 fecha_ini_fcst <- 12
@@ -318,7 +464,7 @@ rbind(ini_9, ini_12) %>%
   labs(color = "Forecast initialization", linetype = NULL, x = NULL, y = NULL) +
   theme_minimal()
 
-ggsave(paste0("sondeos_init_9_12_UTC.png"), height = 7, width = 9)
+ggsave(paste0("sondeos_gfs_init_9_12_UTC.png"), height = 7, width = 9)
 ```
 
 
@@ -339,7 +485,7 @@ rbind(ini_9, ini_12) %>%
        subtitle = "RMSE12 - RMSE09") +
   theme_minimal()
 
-ggsave("RMSE12_RMSE9.png", height = 4, width = 7)
+ggsave("RMSE12_RMSE9_gfs.png", height = 4, width = 7)
 
 rbind(ini_9, ini_12) %>%  
   .[, estadistico := paste0(toupper(estadistico), hora_ini)] %>% 

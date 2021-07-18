@@ -113,11 +113,12 @@ print("Listo los sondeos, no podrían ser más!")
 # leo e interpolo modelo --------------------------------------------------
 
 
-path_npp <- "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw"
+# path_npp <- "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/gfs_raw"
+path_npp <- "/home/paola.corrales/datosmunin3/RRA_Validacion/raw/RRA_Fcst/"
 path_out <- "/home/paola.corrales/datosmunin3/RRA_Validacion/interp_sondeos_fcst/"
 
 # first_date <- ymd_hms("20181109000000")
-first_date <- ymd_hms("20181109090000")
+first_date <- ymd_hms("20181109210000")
 
 # dates <- seq(first_date, by = "6 hour",
 #              length.out = 163) #163
@@ -135,9 +136,10 @@ for (d in seq_along(dates)) {
   dir <- paste0(path_npp, "/", format(ini_date, "%Y%m%d_%H"), "F")
   
   if (!dir.exists(dir)) {
+    print("no existe")
     next
   }
-  
+
   file_wrf <- paste0(path_npp, "/", 
                      format(ini_date, "%Y%m%d_%H"), "F/NPP_",
                      format(ini_date, "%Y"), "-",
@@ -153,7 +155,7 @@ for (d in seq_along(dates)) {
       return(NULL)
     }
     # print(basename(f))
-    meta <- unglue::unglue(f, "/datosalertar1/paula.maldonado/RRA_VERIF/data/raw/wrf_raw/{fecha_ini}F/NPP_{fecha_ini2}_FC{fcst_hour}.nc")
+    meta <- unglue::unglue(f, "/home/paola.corrales/datosmunin3/RRA_Validacion/raw/RRA_Fcst/{fecha_ini}F/NPP_{fecha_ini2}_FC{fcst_hour}.nc")
     
     fcst <- ReadNetCDF(f,
                        vars = c(gp = "yacanto/Z", t = "yacanto/T", u = "yacanto/U", v = "yacanto/V", q = "yacanto/Q")) %>%
