@@ -285,6 +285,7 @@ rbind(sondeos_interp[(hour(fecha) == 12 & fcst_hour == 0) | (hour(fecha) == 18 &
         legend.spacing.y = unit(-0.1, "cm"))
 
 ggsave("opcion1.png", height = 7, width = 7)
+ggsave("opcion1.pdf", height = 7, width = 7)
 
 init <- c(0, 12, 18)
 
@@ -423,7 +424,7 @@ rbind(rmse_12[rmse_9, on = .NATURAL] %>%
         legend.margin = margin(0, 8, 7, 8))
 
 ggsave("diff_rmse_variables.png", height = 7, width = 7)
-
+ggsave("diff_rmse_variables.pdf", height = 7, width = 7)
 
 ```
 

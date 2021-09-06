@@ -27,7 +27,7 @@ Veamos si la compu explota cuando leo todas las observaciones asimiladas
 
 # all <- fread("data/filtradas/obs_all.csv") 
 
-all <- fread("/home/paola.corrales/datosmunin/RRA_Obs/filtradas/obs_all.csv") 
+all <- fread("/home/paola.corrales/datosmunin3/RRA_Validacion/RRA_Obs/filtradas/obs_all.csv") 
 
 all[, time := ymd_hms(time)] %>% 
   .[, time.obs := ymd_hms(time.obs)]
@@ -75,6 +75,24 @@ colores <- viridisLite::viridis(13, direction = 1)
 ```
 
 
+```{r}
+obs_name <- tribble(
+  ~sub.id, ~name,
+  22 , "ASWS",
+  8  , "CSWS",
+  1  , "RS",
+  3  , "AIRPL",
+  21 , "AIRSR",
+  12 , "RADAR",
+  4  , "GDMW",
+  9  , "SHBU") %>% 
+  setDT()
+
+all[, .(percentage = round(.N*100/31569944, 4)), by = sub.id] %>% 
+  obs_name[., on = .NATURAL]
+
+
+```
 
 ```{r}
 breakes <- c(10e3, 50000, 100000, 250000, 500000, 750000, 1000000)
@@ -580,7 +598,7 @@ ggsave("fig/correlacion.pdf", dpi = 300, width = 22, height = 15, units = "cm")
 # files <- Sys.glob("data/espacial*")
 # mount$finalize()
 
-files <- Sys.glob("/home/paola.corrales/datosmunin/RRA_Fcst/estadisticos/espacial*")
+files <- Sys.glob("/home/paola.corrales/datosmunin3/RRA_Validacion/RRA_Fcst/estadisticos/espacial*")
 
 est_espacial <- lapply(files, function(f) {
   var <- str_extract(f, "\\d{5}")
